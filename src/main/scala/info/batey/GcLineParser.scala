@@ -10,11 +10,6 @@ object GcLineParser extends JavaTokenParsers {
   case object Info extends Level
   case object Warn extends Level
 
-  sealed trait Generation
-  case object Young extends Generation
-  case object Mixed extends Generation
-  case object NA extends Generation
-
   case class TimeOffset(l: Long) extends AnyVal
 
   object TimeOffset {
@@ -23,27 +18,16 @@ object GcLineParser extends JavaTokenParsers {
 
   case class Metadata(offset: TimeOffset, level: Level = Info)
 
-  sealed trait G1GcEvent {
-    val metadata: Metadata
-    val gen: Generation = NA
-  }
+  sealed trait PauseType
+  case object Young extends PauseType
+  case object InitialMark extends PauseType
+  case object Remark extends PauseType
+  case object Mixed extends PauseType
 
-  case class GcInfo(metadata: Metadata, msg: String) extends G1GcEvent
+  case class G1GcEvent(metadata: Metadata, event: EventType)
 
-  case class YoungPause(metadata: Metadata, stats: CollectionStats, reason: Reason) extends G1GcEvent {
-    override val gen = Young
-  }
-
-  case class MixedPause(metadata: Metadata, stats: CollectionStats, reason: Reason) extends G1GcEvent {
-    override val gen = Mixed
-  }
-
-  case class InitialMark(metadata: Metadata, stats: CollectionStats, reason: Reason) extends G1GcEvent
-
-  case class ConcurrentCycle(metadata: Metadata) extends G1GcEvent
-  case class Remark(metadata: Metadata, stats: CollectionStats) extends G1GcEvent
-  case class Cleanup(metadata: Metadata, stats: CollectionStats) extends G1GcEvent
-  case class UnknownLine(metadata: Metadata, override val gen: Generation = NA, line: String) extends G1GcEvent
+  sealed trait EventType
+  case class Pause(which: PauseType, stats: CollectionStats, reason: Reason) extends EventType
 
   case class CollectionStats(before: Long, after: Long, total: Long, duration: Duration)
 
@@ -81,38 +65,44 @@ object GcLineParser extends JavaTokenParsers {
 
   def msg: Parser[String] = """.+""".r ^^ identity
 
-  def initialMark: Parser[InitialMark] = header ~ "Pause Initial Mark (G1 Evacuation Pause)" ~ collectionStats ^^ {
-    case meta ~ _ ~ stats => InitialMark(meta, stats, Evacuation)
-  }
+//  def initialMark: Parser[InitialMark] = header ~ "Pause Initial Mark (G1 Evacuation Pause)" ~ collectionStats ^^ {
+//    case meta ~ _ ~ stats => InitialMark(meta, stats, Evacuation)
+//  }
+//
+//  def welconeMsg: Parser[GcInfo] = header ~ "Using G1" ^^ {
+//    case meta ~ msg => GcInfo(meta, msg)
+//  }
+//
+//  def evacuationPause: Parser[G1GcEvent] = header ~ "Pause" ~ "(Young|Mixed)".r ~ "(G1 Evacuation Pause) " ~ collectionStats ^^ {
+//    case meta ~  _ ~ "Young" ~ _ ~ collectionStats => YoungPause(meta, collectionStats, Evacuation)
+//    case meta ~  _ ~ "Mixed" ~ _ ~ collectionStats => MixedPause(meta, collectionStats, Evacuation)
+//  }
+//
+//  def concurrentCycle: Parser[ConcurrentCycle] = header ~ "Concurrent Cycle" ^^ {
+//    case meta ~ _ => ConcurrentCycle(meta)
+//  }
+//
+//  def remark: Parser[Remark] = header ~ "Pause Remark" ~ collectionStats ^^ {
+//    case meta ~ _ ~ stats => Remark(meta, stats)
+//  }
 
-  def welconeMsg: Parser[GcInfo] = header ~ "Using G1" ^^ {
-    case meta ~ msg => GcInfo(meta, msg)
-  }
+//  def cleanup: Parser[Cleanup] = header ~ "Pause Cleanup" ~ collectionStats ^^ {
+//    case meta ~ _ ~ stats => Cleanup(meta, stats)
+//  }
+//
+//  def humongous: Parser[InitialMark] = header ~ "Pause Initial Mark (G1 Humongous Allocation)" ~ collectionStats ^^ {
+//    case meta ~ _ ~ stats => InitialMark(meta, stats, HumongousAllocation)
+//  }
 
-  def evacuationPause: Parser[G1GcEvent] = header ~ "Pause" ~ "(Young|Mixed)".r ~ "(G1 Evacuation Pause) " ~ collectionStats ^^ {
-    case meta ~  _ ~ "Young" ~ _ ~ collectionStats => YoungPause(meta, collectionStats, Evacuation)
-    case meta ~  _ ~ "Mixed" ~ _ ~ collectionStats => MixedPause(meta, collectionStats, Evacuation)
-  }
+//  def unknownLine: Parser[UnknownLine] = """.*""".r ^^ {
+//    case e@_ => UnknownLine(null, NA, e)
+//  }
 
-  def concurrentCycle: Parser[ConcurrentCycle] = header ~ "Concurrent Cycle" ^^ {
-    case meta ~ _ => ConcurrentCycle(meta)
-  }
+  def pause(): Parser[Pause] = ???
 
-  def remark: Parser[Remark] = header ~ "Pause Remark" ~ collectionStats ^^ {
-    case meta ~ _ ~ stats => Remark(meta, stats)
-  }
+  def eventType(): Parser[EventType] = ???
 
-  def cleanup: Parser[Cleanup] = header ~ "Pause Cleanup" ~ collectionStats ^^ {
-    case meta ~ _ ~ stats => Cleanup(meta, stats)
+  def gcLine: Parser[G1GcEvent] = header ~ eventType ^^ {
+    case meta ~ eventType => G1GcEvent(meta, eventType)
   }
-
-  def humongous: Parser[InitialMark] = header ~ "Pause Initial Mark (G1 Humongous Allocation)" ~ collectionStats ^^ {
-    case meta ~ _ ~ stats => InitialMark(meta, stats, HumongousAllocation)
-  }
-
-  def unknownLine: Parser[UnknownLine] = """.*""".r ^^ {
-    case e@_ => UnknownLine(null, NA, e)
-  }
-
-  def gcLine: Parser[G1GcEvent] = humongous | cleanup | remark | evacuationPause | initialMark | concurrentCycle | welconeMsg | unknownLine
 }

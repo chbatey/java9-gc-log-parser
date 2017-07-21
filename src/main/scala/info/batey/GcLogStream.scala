@@ -31,14 +31,14 @@ trait GcLogStream {
     val outlet: Outlet[G1GcEvent] = builder.add(gcEvents).out
     val generations = builder.add(Broadcast[G1GcEvent](3))
 
-    val youngFilter = Flow[G1GcEvent].filter((evt: G1GcEvent) => evt.gen == Young)
-    val mixedFilter = Flow[G1GcEvent].filter((evt: G1GcEvent) => evt.gen == Mixed)
-    val unknownLine = Flow[G1GcEvent].filter(_.isInstanceOf[UnknownLine])
+//    val youngFilter = Flow[G1GcEvent].filter((evt: G1GcEvent) => evt.gen == Young)
+//    val mixedFilter = Flow[G1GcEvent].filter((evt: G1GcEvent) => evt.gen == Mixed)
+//    val unknownLine = Flow[G1GcEvent].filter(_.isInstanceOf[UnknownLine])
 
-    outlet ~> generations
-    generations ~> youngFilter ~> Sink.actorRef(youngGen, "done")
-    generations ~> mixedFilter ~> Sink.actorRef(mixedMsgs, "done")
-    generations ~> unknownLine ~> Sink.foreach(println)
+//    outlet ~> generations
+//    generations ~> youngFilter ~> Sink.actorRef(youngGen, "done")
+//    generations ~> mixedFilter ~> Sink.actorRef(mixedMsgs, "done")
+//    generations ~> unknownLine ~> Sink.foreach(println)
 
     ClosedShape
   })

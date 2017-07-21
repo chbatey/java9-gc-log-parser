@@ -2,8 +2,8 @@ package info.batey.actors
 
 import akka.actor.Actor
 import akka.event.Logging
-import info.batey.GcLineParser.MixedPause
-
+//import info.batey.GcLineParser.MixedPause
+/*
 class MixedGenEvent extends Actor {
 
   val log = Logging(context.system, this)
@@ -18,3 +18,5 @@ class MixedGenEvent extends Actor {
     case m@_ => log.info("Ignoring {}", m)
   }
 }
+
+*/

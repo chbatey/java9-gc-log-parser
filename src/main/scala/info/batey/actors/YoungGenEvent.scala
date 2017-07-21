@@ -2,8 +2,8 @@ package info.batey.actors
 
 import akka.event.Logging
 import akka.persistence.PersistentActor
-import info.batey.GcLineParser.YoungPause
-
+//import info.batey.GcLineParser.YoungPause
+/*
 class YoungGenEvent extends PersistentActor {
 
   val log = Logging(context.system, this)
@@ -31,3 +31,4 @@ class YoungGenEvent extends PersistentActor {
       log.info("Ignoring event {}", e)
   }
 }
+*/
