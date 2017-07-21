@@ -8,11 +8,11 @@ object ILoveGC {
       map += (i -> i.toChar)
       println(i)
       more += (i -> new Array[Byte](i * 10))
-      Thread.sleep(50)
-      if (i % 1000 == 0) {
+      Thread.sleep(10)
+      if (i % 5000 == 0) {
         println("Getting rid of some garbage")
         more = more.filter {
-          case (k, v) => k < 100
+          case (k, v) => k < 2000
         }
       }
     }
