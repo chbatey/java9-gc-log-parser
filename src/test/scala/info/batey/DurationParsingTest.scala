@@ -17,7 +17,7 @@ class DurationParsingTest extends FunSuite with Matchers {
     ("0.010s", 0.01 seconds)
   )
   forAll(durations) { (str: String, dur: Duration) => {
-    parse(duration, str).get should equal(dur)
+    parse(offset, str).get should equal(dur)
   }
   }
 }

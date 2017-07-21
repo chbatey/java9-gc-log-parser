@@ -2,8 +2,8 @@ package info.batey.actors
 
 import akka.actor.Actor
 import akka.event.Logging
-//import info.batey.GcLineParser.MixedPause
-/*
+import info.batey.GC._
+
 class MixedGenEvent extends Actor {
 
   val log = Logging(context.system, this)
@@ -11,12 +11,11 @@ class MixedGenEvent extends Actor {
   var totalPauses: Long = 0
 
   def receive: Receive = {
-    case e: MixedPause =>
+    case e@G1GcEvent(_, Pause(_, CollectionStats(_, _,_, dur), _)) =>
       log.debug("Mixed msg {}", e)
-      totalPauses += e.stats.duration.toMicros
+      totalPauses += dur.toMicros
     case "how much?" => sender() ! totalPauses
     case m@_ => log.info("Ignoring {}", m)
   }
 }
 
-*/
