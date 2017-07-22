@@ -5,10 +5,10 @@ import org.scalatest.{FunSpec, Matchers}
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
-
 import GcLineParser._
 import GC._
 import TimeOffset._
+import org.scalatest.prop.TableDrivenPropertyChecks
 
 class GcLineParserTest extends FunSpec with Matchers {
 
@@ -46,8 +46,33 @@ class GcLineParserTest extends FunSpec with Matchers {
       G1GcEvent(Metadata(83997L), ToSpaceExhausted))
   )
 
-  forAll(lines) { (line: String, outcome: G1GcEvent) => {
+  val heapLines = Table(
+    ("gc_line", "outcome"),
+    ("[0.007s][info][gc,heap] Heap region size: 1M",
+      G1GcEvent(Metadata(7, Info, Set(Gc, Heap)), RegionSize(1)))
+
+  )
+
+  val phasesLines = Table(
+    ("line", "outcome"),
+    ("[4.403s][info][gc,phases    ] GC(0)   Pre Evacuate Collection Set: 0.0ms",
+      G1GcEvent(Metadata(4403, Info, Set(Gc, Phases)), Phase("Pre Evacuate Collection Set", 0 milliseconds)))
+  )
+
+  forAll(phasesLines) { (line: String, outcome: G1GcEvent) => {
     parse(gcLine, line).get should equal(outcome)
+  }
+  }
+}
+
+class PhaseParserTest extends TableDrivenPropertyChecks with Matchers {
+  val phaseExamples = Table(
+    ("text", "outcome"),
+    ("   Pre Evacuate Collection Set: 0.0ms", Phase("Pre Evacuate Collection Set", 0 milliseconds))
+  )
+
+  forAll(phaseExamples) { (line: String, outcome: Phase) => {
+    parse(phases, line).get should equal(outcome)
   }
   }
 }
@@ -60,6 +85,19 @@ class ReasonParserTest extends FunSpec with Matchers {
 
   forAll(reasons) { (line: String, outcome: Reason) => {
     parse(reason, line).get should equal(outcome)
+  }
+  }
+}
+
+class MetadataParserTest extends FunSpec with Matchers {
+  val metadataLines = Table(
+    ("text", "outcome"),
+    ("[0.007s][info][gc,heap]", Metadata(7, Info, Set(Gc, Heap))),
+    ("[0.007s][info][gc,phases    ]", Metadata(7, Info, Set(Gc, Phases)))
+  )
+
+  forAll(metadataLines) { (line: String, outcome: Metadata) => {
+    parse(header, line).get should equal(outcome)
   }
   }
 }

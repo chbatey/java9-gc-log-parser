@@ -1,19 +1,27 @@
 package info.batey
 
 import scala.concurrent.duration.Duration
+import scala.language.implicitConversions
 
 object GC {
   sealed trait Level
+  case object Debug extends Level
   case object Info extends Level
   case object Warn extends Level
 
-  case class TimeOffset(l: Long) extends AnyVal
+  sealed trait Tag
+  case object Gc extends Tag
+  case object Phases extends Tag
+  case object Heap extends Tag
+  case object Start extends Tag
+  case object Cpu extends Tag
+  case object StringTable extends Tag
+  case object Metaspace extends Tag
+  case object Marking extends Tag
+  case object Exit extends Tag
 
-  object TimeOffset {
-    implicit def toOffset(l: Long): TimeOffset = TimeOffset(l)
-  }
-
-  case class Metadata(offset: TimeOffset, level: Level = Info)
+  // todo remove defaults
+  case class Metadata(offset: TimeOffset, level: Level = Info, tags: Set[Tag] = Set(Gc))
 
   sealed trait Line
   case class G1GcEvent(metadata: Metadata, event: EventDesc) extends Line
@@ -24,6 +32,12 @@ object GC {
   case object ConcurrentCycle extends EventDesc
   case object UsingG1 extends EventDesc
   case object ToSpaceExhausted extends EventDesc
+
+  sealed trait HeapInfo extends EventDesc
+  case class RegionSize(size: Long) extends HeapInfo
+
+  // Could be broken into multiple cases
+  case class Phase(details: String, time: Duration) extends EventDesc
 
   sealed trait PauseType
   case object Young extends PauseType
@@ -41,4 +55,9 @@ object GC {
   case object AllocationFailure extends Reason
   case object NA extends Reason
 
+  object TimeOffset {
+    implicit def toOffset(l: Long): TimeOffset = TimeOffset(l)
+    implicit def toOffset(l: Int): TimeOffset = TimeOffset(l)
+  }
+  case class TimeOffset(l: Long) extends AnyVal
 }

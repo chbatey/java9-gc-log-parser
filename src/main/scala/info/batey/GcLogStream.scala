@@ -19,8 +19,10 @@ trait GcLogStream {
   implicit val system: ActorSystem
   implicit val materialiser: ActorMaterializer
 
-  val youngGen: ActorRef
-  val mixedMsgs: ActorRef
+  val young: ActorRef
+  val mixed: ActorRef
+  val full: ActorRef
+  val unknown: ActorRef
 
   val source: Source[String, NotUsed] = FileTailSource
     .lines(Paths.get("gc.log"), 1024, 1 second)
@@ -31,7 +33,7 @@ trait GcLogStream {
   lazy val process: RunnableGraph[NotUsed] = RunnableGraph.fromGraph(GraphDSL.create() { implicit builder: GraphDSL.Builder[NotUsed] =>
     import GraphDSL.Implicits._
     val outlet: Outlet[Line] = builder.add(gcEvents).out
-    val generations = builder.add(Broadcast[Line](3))
+    val generations = builder.add(Broadcast[Line](4))
 
     val youngFilter = Flow[Line].filter( {
       case G1GcEvent(_, Pause(Young, _, _)) => true
@@ -43,12 +45,18 @@ trait GcLogStream {
       case _ => false
     })
 
+    val fullFilter = Flow[Line].filter({
+      case G1GcEvent(_, Pause(Full, _, _)) => true
+      case _ => false
+    })
+
     val unknownLine = Flow[Line].filter(_.isInstanceOf[UnknownLine])
 
     outlet ~> generations
-    generations ~> youngFilter ~> Sink.actorRef(youngGen, "done")
-    generations ~> mixedFilter ~> Sink.actorRef(mixedMsgs, "done")
-    generations ~> unknownLine ~> Sink.foreach(println)
+    generations ~> youngFilter ~> Sink.actorRef(young, "done")
+    generations ~> mixedFilter ~> Sink.actorRef(mixed, "done")
+    generations ~> mixedFilter ~> Sink.actorRef(full, "done")
+    generations ~> unknownLine ~> Sink.actorRef(unknown, "done")
 
     ClosedShape
   })

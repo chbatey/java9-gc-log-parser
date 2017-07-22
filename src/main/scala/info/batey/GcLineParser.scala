@@ -2,7 +2,7 @@ package info.batey
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration._
-import scala.language.implicitConversions
+import scala.language.{implicitConversions, postfixOps}
 import scala.util.parsing.combinator.JavaTokenParsers
 
 object GcLineParser extends JavaTokenParsers {
@@ -24,8 +24,14 @@ object GcLineParser extends JavaTokenParsers {
     case time ~ "s" => time.toDouble seconds
   }
 
-  def header: Parser[Metadata] = "[" ~ offset ~ "]" ~ level ~ "[gc]" ~ opt(eventId) ^^ {
-    case _ ~ ts ~ _ ~ lvl ~ _ ~ _ => Metadata(ts.toMillis, lvl)
+  def tag: Parser[Tag] = "(gc|heap|phases)".r ~ opt(",") ^^ {
+    case "gc" ~ _ => Gc
+    case "heap" ~ _ => Heap
+    case "phases" ~ _ => Phases
+  }
+
+  def header: Parser[Metadata] = "[" ~ offset ~ "]" ~ level ~ "[" ~ (tag+) ~ "]" ~ opt(eventId) ^^ {
+    case _ ~ ts ~ _ ~ lvl ~ _ ~ tags ~ _  ~ _ => Metadata(ts.toMillis, lvl, tags.toSet)
   }
 
   def collectionStats: Parser[CollectionStats] = wholeNumber ~ "M->" ~ wholeNumber ~ "M(" ~ wholeNumber ~ "M) " ~ offset ^^ {
@@ -60,7 +66,17 @@ object GcLineParser extends JavaTokenParsers {
 
   def usingG1: Parser[EventDesc] = "Using G1".r ^^ {_ => UsingG1}
 
-  def eventDesc: Parser[EventDesc] = pause | concurrentCycle | tooSpace | usingG1
+  def regionSize: Parser[RegionSize] = "Heap region size: " ~ wholeNumber ~ "M" ^^ {
+    case _ ~ num ~ _ => RegionSize(num.toLong)
+  }
+
+  def heapEvent: Parser[HeapInfo] = regionSize
+
+  def phases: Parser[Phase] = "[a-zA-Z ]*".r ~ ":" ~ offset ^^ {
+    case str ~ _ ~ offset => Phase(str, offset)
+  }
+
+  def eventDesc: Parser[EventDesc] = pause | concurrentCycle | tooSpace | usingG1 | heapEvent | phases
 
   def gcLine: Parser[G1GcEvent] = header ~ eventDesc ^^ {
     case meta ~ eventType => G1GcEvent(meta, eventType)

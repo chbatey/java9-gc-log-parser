@@ -5,7 +5,7 @@ lazy val root = (project in file(".")).
     inThisBuild(List(
       organization := "info.batey",
       scalaVersion := "2.12.2",
-      version      := "0.1.0-SNAPSHOT"
+      version := "0.1.0-SNAPSHOT"
     )),
     name := "gc-log-parser",
     libraryDependencies += scalaTest % Test
@@ -31,3 +31,14 @@ libraryDependencies +=
   "com.typesafe.akka" %% "akka-persistence" % akkaVersion
 
 libraryDependencies += "com.typesafe.akka" %% "akka-persistence-cassandra" % "0.29"
+
+libraryDependencies += "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion
+
+
+assemblyMergeStrategy in assembly := {
+  case PathList(ps@_*) if ps.last endsWith ".properties"  => MergeStrategy.concat
+  case "application.conf"                           => MergeStrategy.concat
+  case x =>
+    val oldStrategy = (assemblyMergeStrategy in assembly).value
+    oldStrategy(x)
+}
