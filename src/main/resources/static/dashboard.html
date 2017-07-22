@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GC is cool</title>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="http://www.flotcharts.org/flot/jquery.flot.js"></script>
+    <link rel="stylesheet" type="text/css" href="http://www.flotcharts.org/flot/examples/examples.css">
+    <meta charset="UTF-8">
+</head>
+<body>
+
+<script>
+    $( document ).ready(function() {
+        var source = new EventSource("/stream/pauses");
+        source.onmessage = function (event) {
+            var data = JSON.parse(event.data);
+            $("#preload h2").text('STW pauses: ' + data.totalStw + ' microseconds');
+        };
+    });
+</script>
+<div id="header">
+    <h2 align="center">GC pauses</h2>
+</div>
+
+<div id="preload"><h2></h2></div>
+
+</body>
+</html>
