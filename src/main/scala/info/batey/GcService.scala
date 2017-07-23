@@ -2,41 +2,35 @@ package info.batey
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.event.Logging
-import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Keep, Sink}
-import info.batey.actors.{GcStateActor, PauseTotalActor, UnknownLineEvent}
+import info.batey.actors.GcStateActor.{GcState, HeapSize}
+import info.batey.actors.{GcStateActor, OldGenerationActor, UnknownLineEvent, YoungGenerationActor}
+import spray.json._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.io.StdIn
+object GcService extends GcLogStream with DefaultJsonProtocol {
 
-object GcService extends HttpFrontEnd with GcLogStream {
+  // todo remove these once we remove the foreach Sink
+  implicit val hsFormat: RootJsonFormat[HeapSize] = jsonFormat2(HeapSize)
+  implicit val gsFormat: RootJsonFormat[GcState] = jsonFormat3(GcState)
 
   override implicit val system: ActorSystem = ActorSystem("GCParser")
   override implicit val materialiser: ActorMaterializer = ActorMaterializer()
 
   val log = Logging(system, "main")
 
-  override val young: ActorRef = system.actorOf(Props(classOf[PauseTotalActor]))
-  override val mixed: ActorRef = system.actorOf(Props(classOf[PauseTotalActor]))
-  override val full: ActorRef = system.actorOf(Props(classOf[PauseTotalActor]))
-  override val unknown: ActorRef = system.actorOf(Props(classOf[UnknownLineEvent]))
-  override val gcState: ActorRef = system.actorOf(Props(classOf[GcStateActor]))
+  override val young: ActorRef = system.actorOf(Props(classOf[YoungGenerationActor]), "YoungGen")
+  override val full: ActorRef = system.actorOf(Props(classOf[OldGenerationActor]), "Tenured")
+  override val unknown: ActorRef = system.actorOf(Props(classOf[UnknownLineEvent]), "UnknownMsgs")
+  override val gcState: ActorRef = system.actorOf(Props(classOf[GcStateActor]), "GcState")
 
   val mode = "console"
 
   def main(args: Array[String]): Unit = {
     // todo cmd line args
     // todo in http mode we need to create the actors per request
-    if (mode == "http") {
-      val bound = Http().bindAndHandle(route, "localhost", 9090)
-      log.info("Listing on port {}", 9090)
-      StdIn.readLine()
-      bound.flatMap(_.unbind()).onComplete(_ => system.terminate())
-    } else {
-      val consoleMode = process.toMat(Sink.foreach(println))(Keep.right)
-      consoleMode.run()
-    }
+    val consoleMode = process.toMat(Sink.foreach(gs => println(gs.toJson)))(Keep.right)
+    consoleMode.run()
     //todo open tsdb and prometheus sinks!
   }
 }

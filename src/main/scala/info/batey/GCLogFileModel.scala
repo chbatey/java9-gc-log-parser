@@ -3,7 +3,7 @@ package info.batey
 import scala.concurrent.duration.Duration
 import scala.language.implicitConversions
 
-object GC {
+object GCLogFileModel {
   sealed trait Level
   case object Debug extends Level
   case object Info extends Level

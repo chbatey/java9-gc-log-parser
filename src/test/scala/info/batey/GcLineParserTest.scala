@@ -6,7 +6,7 @@ import org.scalatest.{FunSpec, Matchers}
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import GcLineParser._
-import GC._
+import GCLogFileModel._
 import TimeOffset._
 import org.scalatest.prop.TableDrivenPropertyChecks
 

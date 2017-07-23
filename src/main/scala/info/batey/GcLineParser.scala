@@ -7,7 +7,7 @@ import scala.util.parsing.combinator.JavaTokenParsers
 
 object GcLineParser extends JavaTokenParsers {
 
-  import GC._
+  import GCLogFileModel._
   import TimeOffset._
 
   def timestamp: Parser[String] = "[" ~ floatingPointNumber ~ "s]" ^^ {

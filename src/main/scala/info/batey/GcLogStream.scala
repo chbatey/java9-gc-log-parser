@@ -10,10 +10,9 @@ import akka.stream.alpakka.file.scaladsl.FileTailSource
 import akka.stream.scaladsl._
 
 import scala.concurrent.duration._
-import GC._
+import GCLogFileModel._
 import akka.util.Timeout
-import info.batey.actors.GcStateActor.GcState
-import info.batey.actors.PauseTotalActor.PauseEvent
+import info.batey.actors.GcStateActor.{GcEvent, GcState}
 
 import scala.concurrent.Future
 import scala.language.postfixOps
@@ -27,7 +26,6 @@ trait GcLogStream {
   implicit val materialiser: ActorMaterializer
 
   val young: ActorRef
-  val mixed: ActorRef
   val full: ActorRef
   val gcState: ActorRef
   val unknown: ActorRef
@@ -43,25 +41,23 @@ trait GcLogStream {
   lazy val process: Source[GcState, NotUsed] = Source.fromGraph(GraphDSL.create() { implicit builder =>
     import GraphDSL.Implicits._
 
-    val fanFactor = 3
+    val fanFactor = 2
     val outlet = builder.add(gcEvents).out
     val generations = builder.add(Broadcast[Line](fanFactor))
-    val merge = builder.add(Merge[PauseEvent](fanFactor))
+    val merge = builder.add(Merge[GcEvent](fanFactor))
 
     val youngFilter = filterForPauseType(Young)
-    val mixedFilter = filterForPauseType(Mixed)
     val fullFilter = filterForPauseType(Full)
 
-    val youngFlow = flowFromActor[Line, PauseEvent](young)
-    val mixedFlow = flowFromActor[Line, PauseEvent](mixed)
-    val oldFlow = flowFromActor[Line, PauseEvent](full)
-    val gcStateFlow = flowFromActor[PauseEvent, GcState](gcState)
+    val youngFlow = flowFromActor[Line, GcEvent](young)
+    val oldFlow = flowFromActor[Line, GcEvent](full)
+
+    val gcStateFlow = flowFromActor[GcEvent, GcState](gcState)
 
     val end = builder.add(gcStateFlow)
 
     outlet ~> generations
     generations ~> youngFilter ~> youngFlow ~> merge
-    generations ~> mixedFilter ~> mixedFlow ~> merge
     generations ~> fullFilter ~> oldFlow ~> merge
     // todo deal with un-parsed lines down a different flow
     //    val unknownLine: Flow[Line, Line, NotUsed] = Flow[Line].filter(_.isInstanceOf[UnknownLine])
@@ -79,6 +75,7 @@ trait GcLogStream {
 
   private def flowFromActor[From: ClassTag, To: ClassTag](actor: ActorRef): Flow[From, To, NotUsed] = {
     implicit val timeout = Timeout(1 second)
+
     val processor: From => Future[To] = (from: From) => {
       (actor ? from).mapTo[To]
     }

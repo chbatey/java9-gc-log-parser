@@ -2,7 +2,7 @@ package info.batey.actors
 
 import akka.actor.Actor
 import akka.event.Logging
-import info.batey.GC.UnknownLine
+import info.batey.GCLogFileModel.UnknownLine
 import info.batey.actors.UnknownLineEvent.GetUnknownLines
 
 class UnknownLineEvent extends Actor {
