@@ -24,20 +24,29 @@ object GCLogFileModel {
   case class Metadata(offset: TimeOffset, level: Level = Info, tags: Set[Tag] = Set(Gc))
 
   sealed trait Line
-  case class G1GcEvent(metadata: Metadata, event: EventDesc) extends Line
+  case class G1GcLine(metadata: Metadata, event: LineDesc) extends Line
   case class UnknownLine(line: String) extends Line
 
-  sealed trait EventDesc
-  case class Pause(which: PauseType, stats: CollectionStats, reason: Option[Reason]) extends EventDesc
-  case object ConcurrentCycle extends EventDesc
-  case object UsingG1 extends EventDesc
-  case object ToSpaceExhausted extends EventDesc
+  sealed trait LineDesc
+  case class PauseStart(which: PauseType, reason: Option[Reason]) extends LineDesc
+  case class PauseEnd(which: PauseType, stats: CollectionStats, reason: Option[Reason]) extends LineDesc
+  case object ConcurrentCycle extends LineDesc
+  case object UsingG1 extends LineDesc
+  case object ToSpaceExhausted extends LineDesc
+  case class NrRegions(region: Region, before: Long, after: Long) extends LineDesc
 
-  sealed trait HeapInfo extends EventDesc
+  sealed trait HeapInfo extends LineDesc
   case class RegionSize(size: Long) extends HeapInfo
 
+  sealed trait Region
+  case object Eden extends Region
+  case object Survivor extends Region
+  case object Old extends Region
+  case object Humongous extends Region
+
+
   // Could be broken into multiple cases
-  case class Phase(details: String, time: Duration) extends EventDesc
+  case class Phase(details: String, time: Duration) extends LineDesc
 
   sealed trait PauseType
   case object Young extends PauseType
@@ -59,5 +68,5 @@ object GCLogFileModel {
     implicit def toOffset(l: Long): TimeOffset = TimeOffset(l)
     implicit def toOffset(l: Int): TimeOffset = TimeOffset(l)
   }
-  case class TimeOffset(l: Long) extends AnyVal
+  case class TimeOffset(millis: Long) extends AnyVal
 }

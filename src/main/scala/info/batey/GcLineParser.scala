@@ -24,10 +24,11 @@ object GcLineParser extends JavaTokenParsers {
     case time ~ "s" => time.toDouble seconds
   }
 
-  def tag: Parser[Tag] = "(gc|heap|phases)".r ~ opt(",") ^^ {
+  def tag: Parser[Tag] = "(gc|start|heap|phases)".r ~ opt(",") ^^ {
     case "gc" ~ _ => Gc
     case "heap" ~ _ => Heap
     case "phases" ~ _ => Phases
+    case "start" ~ _ => Start
   }
 
   def header: Parser[Metadata] = "[" ~ offset ~ "]" ~ level ~ "[" ~ (tag+) ~ "]" ~ opt(eventId) ^^ {
@@ -57,14 +58,14 @@ object GcLineParser extends JavaTokenParsers {
     case "Full" => Full
   }
 
-  def pause: Parser[Pause] = "Pause" ~ pauseType ~ opt(reason) ~ collectionStats ^^ {
-    case _ ~ pauseType ~ reason ~ collectionStats => Pause(pauseType, collectionStats, reason)
+  def pause: Parser[PauseEnd] = "Pause" ~ pauseType ~ opt(reason) ~ collectionStats ^^ {
+    case _ ~ pauseType ~ reason ~ collectionStats => PauseEnd(pauseType, collectionStats, reason)
   }
 
-  def concurrentCycle: Parser[EventDesc] = "Concurrent Cycle".r ^^ (_ => ConcurrentCycle)
-  def tooSpace: Parser[EventDesc] = "To-space exhausted".r ^^ (_ => ToSpaceExhausted)
+  def concurrentCycle: Parser[LineDesc] = "Concurrent Cycle".r ^^ (_ => ConcurrentCycle)
+  def tooSpace: Parser[LineDesc] = "To-space exhausted".r ^^ (_ => ToSpaceExhausted)
 
-  def usingG1: Parser[EventDesc] = "Using G1".r ^^ {_ => UsingG1}
+  def usingG1: Parser[LineDesc] = "Using G1".r ^^ { _ => UsingG1}
 
   def regionSize: Parser[RegionSize] = "Heap region size: " ~ wholeNumber ~ "M" ^^ {
     case _ ~ num ~ _ => RegionSize(num.toLong)
@@ -76,10 +77,29 @@ object GcLineParser extends JavaTokenParsers {
     case str ~ _ ~ offset => Phase(str, offset)
   }
 
-  def eventDesc: Parser[EventDesc] = pause | concurrentCycle | tooSpace | usingG1 | heapEvent | phases
+  def pauseStart: Parser[PauseStart] = "Pause" ~ pauseType ~ opt(reason) ^^ {
+    case _ ~ pauseType ~ reason => PauseStart(pauseType, reason)
+  }
 
-  def gcLine: Parser[G1GcEvent] = header ~ eventDesc ^^ {
-    case meta ~ eventType => G1GcEvent(meta, eventType)
+  def region: Parser[Region] = "(Eden|Survivor|Old|Humongous)".r ^^ {
+    case "Eden" => Eden
+    case "Survivor" => Survivor
+    case "Old" => Old
+    case "Humongous" => Humongous
+  }
+
+  def nrInParen: Parser[Long] = "(" ~ wholeNumber ~ ")" ^^ {
+    case _ ~ nr ~ _ => nr.toLong
+  }
+
+  def nrRegions: Parser[NrRegions] = region ~ "regions:" ~ wholeNumber ~ "->" ~ wholeNumber ~ opt(nrInParen) ^^ {
+    case region ~ _ ~ before ~ _ ~ after ~ _ => NrRegions(region, before.toLong, after.toLong)
+  }
+
+  def lineDesc: Parser[LineDesc] = nrRegions | pause | pauseStart | concurrentCycle | tooSpace | usingG1 | heapEvent | phases
+
+  def gcLine: Parser[G1GcLine] = header ~ lineDesc ^^ {
+    case meta ~ eventType => G1GcLine(meta, eventType)
   }
 
   def unknown: Parser[Line] = ".*".r ^^ {

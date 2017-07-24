@@ -11,23 +11,16 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Source
 import akka.util.Timeout
-import info.batey.actors.GcStateActor.{GcState, HeapSize}
-import info.batey.actors.YoungGenerationActor.TotalPause
+import info.batey.actors.GcStateActor.{GcState, GenerationSizes, HeapSize}
+import info.batey.actors.PauseActor.TotalPause
 import spray.json._
 
 import scala.concurrent.duration._
 
-trait JsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
-  implicit val totalPause: RootJsonFormat[TotalPause] = jsonFormat1(TotalPause)
-  implicit val size: RootJsonFormat[HeapSize] = jsonFormat2(HeapSize)
-  implicit val gc: RootJsonFormat[GcState] = jsonFormat3(GcState)
-}
-
-trait HttpFrontEnd extends JsonSupport {
+trait HttpFrontEnd extends GcStateJson {
   implicit val timeout = Timeout(1, TimeUnit.SECONDS)
 
   val young: ActorRef
-  val full: ActorRef
   val unknown: ActorRef
 
   val process: Source[GcState, NotUsed]
