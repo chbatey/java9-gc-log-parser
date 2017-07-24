@@ -27,7 +27,7 @@ object GcService extends GcLogStream with GcStateJson {
     val consoleMode = process.recover {
       case e: Throwable =>
         e.printStackTrace(System.out)
-        GcState(0, 0, 0, HeapSize(0, 0), 0.0, GenerationSizes(0, 0, 0, 0))
+        GcState(0, 0, 0, 0, 0, HeapSize(0, 0), 0.0, GenerationSizes(0, 0, 0, 0))
     }.toMat(Sink.foreach(gs => println(gs.toJson)))(Keep.right)
     consoleMode.run()
     //todo open tsdb and prometheus sinks!

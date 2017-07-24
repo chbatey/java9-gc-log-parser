@@ -51,7 +51,7 @@ trait GcLogStream {
     val generations = builder.add(Broadcast[Line](fanFactor))
     val merge = builder.add(Merge[GcEvent](fanFactor))
 
-    val supportedPauseTypes: Set[PauseType] = Set(Full, Young, InitialMark)
+    val supportedPauseTypes: Set[PauseType] = Set(Full, Young, InitialMark, Remark, Mixed)
     val youngFilter = Flow[Line].filter({
       case G1GcLine(_, PauseEnd(ty, _, _)) if supportedPauseTypes.contains(ty) => true
       case G1GcLine(_, PauseStart(ty, _)) if supportedPauseTypes.contains(ty) => true

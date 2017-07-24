@@ -2,7 +2,7 @@ package info.batey.actors
 
 import akka.actor.Actor
 import akka.event.Logging
-import info.batey.GCLogFileModel.{Full, InitialMark, PauseType, Young}
+import info.batey.GCLogFileModel._
 import info.batey.actors.GcStateActor._
 
 import scala.concurrent.duration.Duration
@@ -13,11 +13,11 @@ class GcStateActor extends Actor {
 
   private val log = Logging(context.system, this)
 
-  def receive: Receive = gcState(GcState(0, 0, 0, HeapSize(0,0), 0, GenerationSizes(0, 0, 0, 0)))
+  def receive: Receive = gcState(GcState(0, 0, 0, 0, 0, HeapSize(0, 0), 0, GenerationSizes(0, 0, 0, 0)))
 
   def gcState(gs: GcState): Receive = {
-    case PauseDetails(pauseType, dur, HeapSizes(before, after, total), allocationRatePerMb, genSizes) =>
-      val newState  = pauseType match {
+    case DetailedPause(pauseType, _, HeapSizes(_, after, total), allocationRatePerMb, genSizes) =>
+      val newState = pauseType match {
         case Young =>
           gs.copy(youngGcs = gs.youngGcs + 1,
             heapSize = HeapSize(after, total),
@@ -36,11 +36,26 @@ class GcStateActor extends Actor {
             allocationRatePerMb = allocationRatePerMb,
             generationSizes = genSizes
           )
+        case Mixed =>
+          gs.copy(mixed = gs.mixed + 1,
+            heapSize = HeapSize(after, total),
+            allocationRatePerMb = allocationRatePerMb,
+            generationSizes = genSizes
+          )
         case ty@_ =>
           log.warning("Ignoring pause type: {}", ty)
           gs
       }
-
+      sender ! newState
+      become(gcState(newState))
+    case BasicPause(pauseType, _, HeapSizes(_, after, total), allocationRatePerMb) =>
+      val newState = pauseType match {
+        case Remark =>
+          gs.copy(remarks = gs.remarks + 1,
+            heapSize = HeapSize(after, total),
+            allocationRatePerMb = allocationRatePerMb,
+          )
+      }
       sender ! newState
       become(gcState(newState))
     case NotInteresting() =>
@@ -55,6 +70,8 @@ object GcStateActor {
                       fullGcs: Long,
                       youngGcs: Long,
                       initialMarks: Long,
+                      remarks: Long,
+                      mixed: Long,
                       heapSize: HeapSize,
                       allocationRatePerMb: Double,
                       generationSizes: GenerationSizes
@@ -66,7 +83,8 @@ object GcStateActor {
   // All gc events
   sealed trait GcEvent
   // shouldn't really use PauseType as it is the file model
-  case class PauseDetails(gen: PauseType, dur: Duration, heapSize: HeapSizes, allocationRatePerMb: Double, genSizes: GenerationSizes) extends GcEvent
+  case class DetailedPause(gen: PauseType, dur: Duration, heapSize: HeapSizes, allocationRatePerMb: Double, genSizes: GenerationSizes) extends GcEvent
+  case class BasicPause(gen: PauseType, dur: Duration, heapSize: HeapSizes, allocationRatePerMb: Double) extends GcEvent
   case class NotInteresting() extends GcEvent
 
   case class HeapSizes(before: Long, after: Long, total: Long)

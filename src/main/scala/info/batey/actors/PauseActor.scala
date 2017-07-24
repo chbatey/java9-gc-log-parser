@@ -16,14 +16,18 @@ class PauseActor extends Actor {
   var previousHeapSize: Long = 0
   var lastOffset: Long = 0
 
-  def receive: Receive = awaitingPause()
+  private val basicPauses: Set[PauseType] = Set(Remark)
 
+  def receive: Receive = awaitingPause()
   // Fsm??
 
   def awaitingPause(): Receive = {
-    case G1GcLine(_, PauseStart(pauseType,_)) =>
+    case G1GcLine(_, PauseStart(pauseType,_)) if !basicPauses.contains(pauseType) =>
       sender ! NotInteresting()
       become(awaitingEdenStats(pauseType))
+    case G1GcLine(_, PauseStart(pauseType,_)) =>
+      sender ! NotInteresting()
+      become(awaitingBasicPause(pauseType))
     case _@msg =>
       // todo remove this once we handle all types of pauses
       sender ! NotInteresting()
@@ -59,7 +63,7 @@ class PauseActor extends Actor {
   }
 
   def awaitingEnd(pauseType: PauseType, eden: NrRegions, surv: NrRegions, old: NrRegions, hum: NrRegions): Receive = {
-    case e@G1GcLine(Metadata(offset,_, _), PauseEnd(pt, CollectionStats(before, after, total, dur), _)) if pauseType == pt => // bug if this guard does not match
+    case G1GcLine(Metadata(offset,_, _), PauseEnd(pt, CollectionStats(before, after, total, dur), _)) if pauseType == pt => // bug if this guard does not match
       val totalAllocatedMB = before - previousHeapSize
       val timeBetweenCollectionMillis = offset.millis - lastOffset
       val allocationRate = (totalAllocatedMB / timeBetweenCollectionMillis.toDouble) * 1000
@@ -68,7 +72,7 @@ class PauseActor extends Actor {
       log.debug("Allocation rate per second: {}", allocationRate)
 
       totalPauses += dur.toMicros
-      sender ! PauseDetails(
+      sender ! DetailedPause(
         pauseType,
         dur,
         HeapSizes(before, after, total),
@@ -79,7 +83,28 @@ class PauseActor extends Actor {
       lastOffset = offset.millis
       become(awaitingPause())
     case _@msg => log.warning("6 {}", msg)
+  }
 
+  def awaitingBasicPause(pauseType: PauseType): Receive = {
+     case G1GcLine(Metadata(offset,_, _), PauseEnd(pt, CollectionStats(before, after, total, dur), _)) if pauseType == pt => // bug if this guard does not match
+      val totalAllocatedMB = before - previousHeapSize
+      val timeBetweenCollectionMillis = offset.millis - lastOffset
+      val allocationRate = (totalAllocatedMB / timeBetweenCollectionMillis.toDouble) * 1000
+
+      log.debug("Allocated {} in {} milliseconds", totalAllocatedMB, timeBetweenCollectionMillis)
+      log.debug("Allocation rate per second: {}", allocationRate)
+
+      totalPauses += dur.toMicros
+      sender ! BasicPause(
+        pauseType,
+        dur,
+        HeapSizes(before, after, total),
+        allocationRate)
+
+      previousHeapSize = after
+      lastOffset = offset.millis
+      become(awaitingPause())
+    case _@msg => log.warning("6 {}", msg)
   }
 }
 
