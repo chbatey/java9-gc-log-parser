@@ -31,11 +31,11 @@ trait GcLogStream {
   val gcState: ActorRef
   val unknown: ActorRef
 
-  val source: Source[String, NotUsed] = FileTailSource
+  val streamLogFile: Source[String, NotUsed] = FileTailSource
     .lines(Paths.get("gc.log"), 1024, 1 second)
 
-  val gcEvents: Source[Line, NotUsed] =
-    source.map(line => parse(gcParser, line).get)
+  val streamedLogEvents: Source[Line, NotUsed] =
+    streamLogFile.map(line => parse(gcParser, line).get)
       .map(msg => {
         log.debug("{}", msg)
         msg
@@ -43,11 +43,10 @@ trait GcLogStream {
 
   // todo turn this into a flow from Line => GcState and re-use for batch processing
   // and a streaming web request
-  lazy val process: Source[GcState, NotUsed] = Source.fromGraph(GraphDSL.create() { implicit builder =>
+  lazy val process: Flow[Line, GcState, NotUsed] = Flow.fromGraph(GraphDSL.create() { implicit builder =>
     import GraphDSL.Implicits._
 
     val fanFactor = 1
-    val outlet = builder.add(gcEvents).out
     val generations = builder.add(Broadcast[Line](fanFactor))
     val merge = builder.add(Merge[GcEvent](fanFactor))
 
@@ -65,13 +64,12 @@ trait GcLogStream {
 
     val end = builder.add(gcStateFlow)
 
-    outlet ~> generations
     generations ~> youngFilter ~> youngFlow ~> merge
     // todo deal with un-parsed lines down a different flow
     //    val unknownLine: Flow[Line, Line, NotUsed] = Flow[Line].filter(_.isInstanceOf[UnknownLine])
     //    generations ~> unknownLine ~> merge
     merge ~> end
-    SourceShape(end.out)
+    FlowShape(generations.in, end.out)
   })
 
 
