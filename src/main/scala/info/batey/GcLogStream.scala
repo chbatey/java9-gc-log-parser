@@ -3,7 +3,7 @@ package info.batey
 import java.nio.file.Paths
 
 import akka.NotUsed
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.event.LoggingAdapter
 import akka.pattern.ask
 import akka.stream._
@@ -11,25 +11,25 @@ import akka.stream.alpakka.file.scaladsl.FileTailSource
 import akka.stream.scaladsl._
 import akka.util.Timeout
 import info.batey.GCLogFileModel._
+import info.batey.GcService.system
 import info.batey.actors.GcStateActor.{GcEvent, GcState}
+import info.batey.actors.{GcStateActor, PauseActor, UnknownLineEvent}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.reflect.ClassTag
 
-trait GcLogStream {
+object GcLogStream {
+  def create()(implicit system: ActorSystem): GcLogStream = new GcLogStream()
+}
 
+class GcLogStream(implicit system: ActorSystem) {
   import GcLineParser._
 
-  implicit val system: ActorSystem
-  implicit val materialiser: ActorMaterializer
-
-  val log: LoggingAdapter
-
-  val young: ActorRef
-  val gcState: ActorRef
-  val unknown: ActorRef
+  val young: ActorRef = system.actorOf(Props(classOf[PauseActor]), "YoungGen")
+  val unknown: ActorRef = system.actorOf(Props(classOf[UnknownLineEvent]), "UnknownMsgs")
+  val gcState: ActorRef = system.actorOf(Props(classOf[GcStateActor]), "GcState")
 
   def fromFile(path: String): Source[GcState, NotUsed] =
     FileTailSource.lines(Paths.get(path), 1024, 1 second)

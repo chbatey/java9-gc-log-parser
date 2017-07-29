@@ -4,51 +4,45 @@ import java.util.concurrent.TimeUnit
 
 import akka.NotUsed
 import akka.actor.ActorRef
+import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
 import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import akka.stream.scaladsl.Source
+import akka.stream.{Inlet, SinkShape}
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, Sink, Source}
 import akka.util.Timeout
 import info.batey.actors.GcStateActor.{GcState, GenerationSizes, HeapSize}
 import info.batey.actors.PauseActor.TotalPause
 import spray.json._
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
-trait HttpFrontEnd extends GcStateJson {
+object HttpFrontEnd extends GcStateJson {
   implicit val timeout = Timeout(1, TimeUnit.SECONDS)
 
-  val young: ActorRef
-  val unknown: ActorRef
-
-  val process: Source[GcState, NotUsed]
-
-  val route: Route = {
+  def routes(implicit logStream: GcLogStream): Route = {
     pathPrefix("static") {
       encodeResponse {
         getFromResourceDirectory("static")
       }
     } ~
-      pathPrefix("stream") {
-        path("pauses") {
-          val s: Source[ServerSentEvent, NotUsed] = process
-            .map(toSSE)
-            .keepAlive(1 second, () => ServerSentEvent.heartbeat)
-            .recover {
-              case e: Throwable =>
-                println(e)
-                e.printStackTrace(System.out)
-                ServerSentEvent(s"We had a problem")
-            }
-          complete(s)
-        }
+    pathPrefix("stream") {
+      path("gc") {
+        val pipeline = logStream.fromGcLog
+          .map(_.toJson.prettyPrint)
+          .map(ServerSentEvent(_, Some("gc-event")))
+          .keepAlive(1 second, () => ServerSentEvent.heartbeat)
+          .recover {
+            case e: Throwable =>
+              println(e)
+              e.printStackTrace(System.out)
+              ServerSentEvent(e.getMessage(), Some("error"))
+          }
+        complete(pipeline)
       }
-  }
-
-  def toSSE(pe: GcState): ServerSentEvent = {
-    println(pe)
-    ServerSentEvent(pe.toJson.prettyPrint)
+    }
   }
 }
