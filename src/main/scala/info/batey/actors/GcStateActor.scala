@@ -2,6 +2,7 @@ package info.batey.actors
 
 import akka.actor.Actor
 import akka.event.Logging
+import info.batey.GCLogFileModel
 import info.batey.GCLogFileModel._
 import info.batey.actors.GcStateActor._
 
@@ -13,31 +14,35 @@ class GcStateActor extends Actor {
 
   private val log = Logging(context.system, this)
 
-  def receive: Receive = gcState(GcState(0, 0, 0, 0, 0, HeapSize(0, 0), 0, GenerationSizes(0, 0, 0, 0)))
+  def receive: Receive = gcState(GcState(TimeOffset(0), 0, 0, 0, 0, 0, HeapSize(0, 0), 0, GenerationSizes(0, 0, 0, 0)))
 
   def gcState(gs: GcState): Receive = {
-    case DetailedPause(pauseType, _, HeapSizes(_, after, total), allocationRatePerMb, genSizes) =>
+    case DetailedPause(timeOffset, pauseType, _, HeapSizes(_, after, total), allocationRatePerMb, genSizes) =>
       val newState = pauseType match {
         case Young =>
-          gs.copy(youngGcs = gs.youngGcs + 1,
+          gs.copy(timeOffset = timeOffset,
+            youngGcs = gs.youngGcs + 1,
             heapSize = HeapSize(after, total),
             allocationRatePerMb = allocationRatePerMb,
             generationSizes = genSizes
           )
         case Full =>
-          gs.copy(fullGcs = gs.fullGcs + 1,
+          gs.copy(timeOffset = timeOffset,
+            fullGcs = gs.fullGcs + 1,
             heapSize = HeapSize(after, total),
             allocationRatePerMb = allocationRatePerMb,
             generationSizes = genSizes
           )
         case InitialMark =>
-          gs.copy(initialMarks = gs.initialMarks + 1,
+          gs.copy(timeOffset = timeOffset,
+            initialMarks = gs.initialMarks + 1,
             heapSize = HeapSize(after, total),
             allocationRatePerMb = allocationRatePerMb,
             generationSizes = genSizes
           )
         case Mixed =>
-          gs.copy(mixed = gs.mixed + 1,
+          gs.copy(timeOffset = timeOffset,
+            mixed = gs.mixed + 1,
             heapSize = HeapSize(after, total),
             allocationRatePerMb = allocationRatePerMb,
             generationSizes = genSizes
@@ -48,10 +53,11 @@ class GcStateActor extends Actor {
       }
       sender ! newState
       become(gcState(newState))
-    case BasicPause(pauseType, _, HeapSizes(_, after, total), allocationRatePerMb) =>
+    case BasicPause(timeOffset, pauseType, _, HeapSizes(_, after, total), allocationRatePerMb) =>
       val newState = pauseType match {
         case Remark =>
-          gs.copy(remarks = gs.remarks + 1,
+          gs.copy(timeOffset = timeOffset,
+            remarks = gs.remarks + 1,
             heapSize = HeapSize(after, total),
             allocationRatePerMb = allocationRatePerMb,
           )
@@ -67,6 +73,7 @@ class GcStateActor extends Actor {
 object GcStateActor {
   // state
   case class GcState(
+                      timeOffset: TimeOffset,
                       fullGcs: Long,
                       youngGcs: Long,
                       initialMarks: Long,
@@ -83,8 +90,8 @@ object GcStateActor {
   // All gc events
   sealed trait GcEvent
   // shouldn't really use PauseType as it is the file model
-  case class DetailedPause(gen: PauseType, dur: Duration, heapSize: HeapSizes, allocationRatePerMb: Double, genSizes: GenerationSizes) extends GcEvent
-  case class BasicPause(gen: PauseType, dur: Duration, heapSize: HeapSizes, allocationRatePerMb: Double) extends GcEvent
+  case class DetailedPause(timeOffset: TimeOffset, gen: PauseType, dur: Duration, heapSize: HeapSizes, allocationRatePerMb: Double, genSizes: GenerationSizes) extends GcEvent
+  case class BasicPause(timeOffset: TimeOffset, gen: PauseType, dur: Duration, heapSize: HeapSizes, allocationRatePerMb: Double) extends GcEvent
   case class NotInteresting() extends GcEvent
 
   case class HeapSizes(before: Long, after: Long, total: Long)
