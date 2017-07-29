@@ -4,8 +4,9 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.event.{Logging, LoggingAdapter}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Keep, Sink}
+import info.batey.GCLogFileModel.TimeOffset
 import info.batey.actors.GcStateActor.{GcState, GenerationSizes, HeapSize}
-import info.batey.actors.{GcStateActor, UnknownLineEvent, PauseActor}
+import info.batey.actors.{GcStateActor, PauseActor, UnknownLineEvent}
 import spray.json._
 
 object GcService extends GcLogStream with GcStateJson {
@@ -27,7 +28,7 @@ object GcService extends GcLogStream with GcStateJson {
     val consoleMode = process.recover {
       case e: Throwable =>
         e.printStackTrace(System.out)
-        GcState(0, 0, 0, 0, 0, HeapSize(0, 0), 0.0, GenerationSizes(0, 0, 0, 0))
+        GcState(TimeOffset(0), 0, 0, 0, 0, 0, HeapSize(0, 0), 0.0, GenerationSizes(0, 0, 0, 0))
     }.toMat(Sink.foreach(gs => println(gs.toJson)))(Keep.right)
     consoleMode.run()
     //todo open tsdb and prometheus sinks!
