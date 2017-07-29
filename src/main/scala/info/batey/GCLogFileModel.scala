@@ -23,6 +23,8 @@ object GCLogFileModel {
   // todo remove defaults
   case class Metadata(offset: TimeOffset, level: Level = Info, tags: Set[Tag] = Set(Gc))
 
+  val emptyMetadata = Metadata(TimeOffset(0))
+
   sealed trait Line
   case class G1GcLine(metadata: Metadata, event: LineDesc) extends Line
   case class UnknownLine(line: String) extends Line
