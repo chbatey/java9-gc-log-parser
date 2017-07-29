@@ -73,6 +73,7 @@ class PauseActor extends Actor {
 
       totalPauses += dur.toMicros
       sender ! DetailedPause(
+        offset,
         pauseType,
         dur,
         HeapSizes(before, after, total),
@@ -96,6 +97,7 @@ class PauseActor extends Actor {
 
       totalPauses += dur.toMicros
       sender ! BasicPause(
+        offset,
         pauseType,
         dur,
         HeapSizes(before, after, total),
