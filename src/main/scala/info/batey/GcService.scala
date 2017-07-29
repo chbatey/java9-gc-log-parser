@@ -4,6 +4,7 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.event.{Logging, LoggingAdapter}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Keep, Sink}
+import info.batey.GCLogFileModel.TimeOffset
 import info.batey.actors.GcStateActor.{GcState, GenerationSizes, HeapSize}
 import info.batey.actors.{GcStateActor, UnknownLineEvent, PauseActor}
 import scala.concurrent.ExecutionContext.Implicits._
@@ -25,11 +26,10 @@ object GcService extends GcLogStream with GcStateJson {
   def main(args: Array[String]): Unit = {
     // todo cmd line args
     // todo in http mode we need to create the actors per request
-
     val (_, gcFun) = process.recover {
         case e: Throwable =>
           e.printStackTrace(System.out)
-          GcState(0, 0, 0, 0, 0, HeapSize(0, 0), 0.0, GenerationSizes(0, 0, 0, 0))
+          GcState(TimeOffset(0), 0, 0, 0, 0, 0, HeapSize(0, 0), 0.0, GenerationSizes(0, 0, 0, 0))
       }.map(_.toJson)
       .runWith(
       streamedLogEvents,
