@@ -6,7 +6,8 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Keep, Sink}
 import info.batey.GCLogFileModel.TimeOffset
 import info.batey.actors.GcStateActor.{GcState, GenerationSizes, HeapSize}
-import info.batey.actors.{GcStateActor, PauseActor, UnknownLineEvent}
+import info.batey.actors.{GcStateActor, UnknownLineEvent, PauseActor}
+import scala.concurrent.ExecutionContext.Implicits._
 import spray.json._
 
 object GcService extends GcLogStream with GcStateJson {
@@ -25,12 +26,15 @@ object GcService extends GcLogStream with GcStateJson {
   def main(args: Array[String]): Unit = {
     // todo cmd line args
     // todo in http mode we need to create the actors per request
-    val consoleMode = process.recover {
-      case e: Throwable =>
-        e.printStackTrace(System.out)
-        GcState(TimeOffset(0), 0, 0, 0, 0, 0, HeapSize(0, 0), 0.0, GenerationSizes(0, 0, 0, 0))
-    }.toMat(Sink.foreach(gs => println(gs.toJson)))(Keep.right)
-    consoleMode.run()
+    val (_, gcFun) = process.recover {
+        case e: Throwable =>
+          e.printStackTrace(System.out)
+          GcState(TimeOffset(0), 0, 0, 0, 0, 0, HeapSize(0, 0), 0.0, GenerationSizes(0, 0, 0, 0))
+      }.map(_.toJson)
+      .runWith(
+      streamedLogEvents,
+      Sink.foreach(println))
+    gcFun.flatMap(_ => system.terminate())
     //todo open tsdb and prometheus sinks!
   }
 }
