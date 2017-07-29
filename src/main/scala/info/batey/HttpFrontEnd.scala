@@ -19,11 +19,12 @@ import spray.json._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 
 object HttpFrontEnd extends GcStateJson {
   implicit val timeout = Timeout(1, TimeUnit.SECONDS)
 
-  def routes(implicit logStream: GcLogStream): Route = {
+  def routes(implicit logStream: GcLogStream): Route = cors() {
     pathPrefix("static") {
       encodeResponse {
         getFromResourceDirectory("static")
