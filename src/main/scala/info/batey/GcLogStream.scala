@@ -31,47 +31,46 @@ trait GcLogStream {
   val gcState: ActorRef
   val unknown: ActorRef
 
-  val streamLogFile: Source[String, NotUsed] = FileTailSource
-    .lines(Paths.get("gc.log"), 1024, 1 second)
+  def fromFile(path: String): Source[GcState, NotUsed] =
+    FileTailSource.lines(Paths.get(path), 1024, 1 second)
+        .via(eventsFlow())
 
-  val streamedLogEvents: Source[Line, NotUsed] =
-    streamLogFile.map(line => parse(gcParser, line).get)
-      .map(msg => {
-        log.debug("{}", msg)
-        msg
-      })
+  def fromGcLog: Source[GcState, NotUsed] =
+    fromFile("gc.log")
 
-  // todo turn this into a flow from Line => GcState and re-use for batch processing
-  // and a streaming web request
-  lazy val process: Flow[Line, GcState, NotUsed] = Flow.fromGraph(GraphDSL.create() { implicit builder =>
-    import GraphDSL.Implicits._
+  private def eventsFlow(): Flow[String, GcState, NotUsed] =
+    Flow[String]
+      .map(parse(gcParser, _).get)
+      .via(
+        Flow.fromGraph(GraphDSL.create() { implicit builder =>
+          import GraphDSL.Implicits._
 
-    val fanFactor = 1
-    val generations = builder.add(Broadcast[Line](fanFactor))
-    val merge = builder.add(Merge[GcEvent](fanFactor))
+          val fanFactor = 1
+          val generations = builder.add(Broadcast[Line](fanFactor))
+          val merge = builder.add(Merge[GcEvent](fanFactor))
 
-    val supportedPauseTypes: Set[PauseType] = Set(Full, Young, InitialMark, Remark, Mixed)
-    val youngFilter = Flow[Line].filter({
-      case G1GcLine(_, PauseEnd(ty, _, _)) if supportedPauseTypes.contains(ty) => true
-      case G1GcLine(_, PauseStart(ty, _)) if supportedPauseTypes.contains(ty) => true
-      case G1GcLine(_, NrRegions(_, _, _)) => true
-      case _ => false
-    })
+          val supportedPauseTypes: Set[PauseType] = Set(Full, Young, InitialMark, Remark, Mixed)
+          val youngFilter = Flow[Line].filter({
+            case G1GcLine(_, PauseEnd(ty, _, _)) if supportedPauseTypes.contains(ty) => true
+            case G1GcLine(_, PauseStart(ty, _)) if supportedPauseTypes.contains(ty) => true
+            case G1GcLine(_, NrRegions(_, _, _)) => true
+            case _ => false
+          })
 
-    val youngFlow = flowFromActor[Line, GcEvent](young)
+          val youngFlow = flowFromActor[Line, GcEvent](young)
 
-    val gcStateFlow = flowFromActor[GcEvent, GcState](gcState)
+          val gcStateFlow = flowFromActor[GcEvent, GcState](gcState)
 
-    val end = builder.add(gcStateFlow)
+          val end = builder.add(gcStateFlow)
 
-    generations ~> youngFilter ~> youngFlow ~> merge
-    // todo deal with un-parsed lines down a different flow
-    //    val unknownLine: Flow[Line, Line, NotUsed] = Flow[Line].filter(_.isInstanceOf[UnknownLine])
-    //    generations ~> unknownLine ~> merge
-    merge ~> end
-    FlowShape(generations.in, end.out)
-  })
-
+          generations ~> youngFilter ~> youngFlow ~> merge
+          // todo deal with un-parsed lines down a different flow
+          //    val unknownLine: Flow[Line, Line, NotUsed] = Flow[Line].filter(_.isInstanceOf[UnknownLine])
+          //    generations ~> unknownLine ~> merge
+          merge ~> end
+          FlowShape(generations.in, end.out)
+        })
+      )
 
   private def flowFromActor[From: ClassTag, To: ClassTag](actor: ActorRef): Flow[From, To, NotUsed] = {
     implicit val timeout = Timeout(1 second)

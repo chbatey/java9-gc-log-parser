@@ -21,21 +21,12 @@ object GcService extends GcLogStream with GcStateJson {
   override val unknown: ActorRef = system.actorOf(Props(classOf[UnknownLineEvent]), "UnknownMsgs")
   override val gcState: ActorRef = system.actorOf(Props(classOf[GcStateActor]), "GcState")
 
-  val mode = "console"
-
   def main(args: Array[String]): Unit = {
-    // todo cmd line args
-    // todo in http mode we need to create the actors per request
-    val (_, gcFun) = process.recover {
-        case e: Throwable =>
-          e.printStackTrace(System.out)
-          GcState(TimeOffset(0), 0, 0, 0, 0, 0, HeapSize(0, 0), 0.0, GenerationSizes(0, 0, 0, 0))
-      }.map(_.toJson)
-      .runWith(
-      streamedLogEvents,
-      Sink.foreach(println))
-    gcFun.flatMap(_ => system.terminate())
-    //todo open tsdb and prometheus sinks!
+    fromGcLog
+      .map(_.toJson)
+      .toMat(Sink.foreach(println))(Keep.right)
+      .run()
+      .flatMap(_ => system.terminate())
   }
 }
 
