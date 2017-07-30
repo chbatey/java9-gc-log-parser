@@ -21,7 +21,11 @@ object GcService extends GcStateJson with HttpFrontEnd {
     implicit val logStream = GcLogStream.create()
     implicit val conf = Conf()
 
-    val end: Future[_] = (conf.outputMode, conf.streamMode) match {
+
+    val modes = (conf.outputMode, conf.streamMode)
+    println("Running in " + modes)
+
+    val end: Future[_] = modes match {
       case (ConsoleMode, OneShot) =>
         consoleOneShot
       case (ConsoleMode, Stream) =>
@@ -47,7 +51,7 @@ object GcService extends GcStateJson with HttpFrontEnd {
 
   def streamHttp(implicit logStream: GcLogStream, config: Conf): Future[Unit] = {
     val httpBinding = Http().bindAndHandle(routes, config.httpHost, config.httpPort)
-    println(s"Servig HTTP requests at http://${}:${config.httpHost}/${config.httpPort}/gc")
+    println(s"Servig HTTP requests at http://${config.httpHost}/${config.httpPort}/gc")
     println("Press ENTER to terminate")
     StdIn.readLine()
     httpBinding.flatMap(_.unbind())
