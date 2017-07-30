@@ -5,12 +5,11 @@ import java.util.UUID
 
 import akka.NotUsed
 import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.event.LoggingAdapter
 import akka.pattern.ask
 import akka.stream._
 import akka.stream.alpakka.file.scaladsl.FileTailSource
 import akka.stream.scaladsl._
-import akka.util.Timeout
+import akka.util.{ByteString, Timeout}
 import info.batey.GCLogFileModel._
 import info.batey.actors.GcStateActor.{GcEvent, GcState}
 import info.batey.actors.{GcStateActor, PauseActor, UnknownLineEvent}
@@ -25,14 +24,19 @@ object GcLogStream {
 }
 
 class GcLogStream(implicit system: ActorSystem) {
+
   import GcLineParser._
 
-  def fromFile(path: String): Source[GcState, NotUsed] =
-    FileTailSource.lines(Paths.get(path), 1024, 1 second)
-        .via(eventsFlow())
+  def oneOffFromFile(path: String): Source[GcState, _] = {
+     FileIO.fromPath(Paths.get(path))
+      .via(Framing.delimiter(ByteString("\n"), maximumFrameLength = 1024))
+      .map(_.utf8String)
+      .via(eventsFlow())
+  }
 
-  def fromGcLog(): Source[GcState, NotUsed] =
-    fromFile("gc.log")
+  def tailFile(path: String): Source[GcState, NotUsed] =
+    FileTailSource.lines(Paths.get(path), 1024, 1 second)
+      .via(eventsFlow())
 
   private def eventsFlow(): Flow[String, GcState, NotUsed] = {
     val uuid = UUID.randomUUID()
@@ -63,7 +67,7 @@ class GcLogStream(implicit system: ActorSystem) {
           val end = builder.add(gcStateFlow)
 
           generations ~> pausesFilter ~> pauseCollector ~> merge
-          // todo deal with un-parsed lines down a different flow
+          // todo deal with un-parsed lines down a different route
           merge ~> end
           FlowShape(generations.in, end.out)
         })
