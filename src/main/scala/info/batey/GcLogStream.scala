@@ -1,9 +1,10 @@
 package info.batey
 
 import java.nio.file.Paths
+import java.util.UUID
 
 import akka.NotUsed
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.event.LoggingAdapter
 import akka.pattern.ask
 import akka.stream._
@@ -12,66 +13,62 @@ import akka.stream.scaladsl._
 import akka.util.Timeout
 import info.batey.GCLogFileModel._
 import info.batey.actors.GcStateActor.{GcEvent, GcState}
+import info.batey.actors.{GcStateActor, PauseActor, UnknownLineEvent}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.reflect.ClassTag
 
-trait GcLogStream {
+object GcLogStream {
+  def create()(implicit system: ActorSystem): GcLogStream = new GcLogStream()
+}
 
+class GcLogStream(implicit system: ActorSystem) {
   import GcLineParser._
 
-  implicit val system: ActorSystem
-  implicit val materialiser: ActorMaterializer
+  def fromFile(path: String): Source[GcState, NotUsed] =
+    FileTailSource.lines(Paths.get(path), 1024, 1 second)
+        .via(eventsFlow())
 
-  val log: LoggingAdapter
+  def fromGcLog(): Source[GcState, NotUsed] =
+    fromFile("gc.log")
 
-  val young: ActorRef
-  val gcState: ActorRef
-  val unknown: ActorRef
+  private def eventsFlow(): Flow[String, GcState, NotUsed] = {
+    val uuid = UUID.randomUUID()
+    val young: ActorRef = system.actorOf(Props(classOf[PauseActor]), s"YoungGen-${uuid.toString}")
+    val gcState: ActorRef = system.actorOf(Props(classOf[GcStateActor]), s"GcState-${uuid.toString}")
+    Flow[String]
+      .map(parse(gcParser, _).get)
+      .via(
+        Flow.fromGraph(GraphDSL.create() { implicit builder =>
+          import GraphDSL.Implicits._
 
-  val streamLogFile: Source[String, NotUsed] = FileTailSource
-    .lines(Paths.get("gc.log"), 1024, 1 second)
+          val fanFactor = 1
+          val generations = builder.add(Broadcast[Line](fanFactor))
+          val merge = builder.add(Merge[GcEvent](fanFactor))
 
-  val streamedLogEvents: Source[Line, NotUsed] =
-    streamLogFile.map(line => parse(gcParser, line).get)
-      .map(msg => {
-        log.debug("{}", msg)
-        msg
-      })
+          val supportedPauseTypes: Set[PauseType] = Set(Full, Young, InitialMark, Remark, Mixed)
+          val pausesFilter = Flow[Line].filter({
+            case G1GcLine(_, PauseEnd(ty, _, _)) if supportedPauseTypes.contains(ty) => true
+            case G1GcLine(_, PauseStart(ty, _)) if supportedPauseTypes.contains(ty) => true
+            case G1GcLine(_, NrRegions(_, _, _)) => true
+            case _ => false
+          })
 
-  // todo turn this into a flow from Line => GcState and re-use for batch processing
-  // and a streaming web request
-  lazy val process: Flow[Line, GcState, NotUsed] = Flow.fromGraph(GraphDSL.create() { implicit builder =>
-    import GraphDSL.Implicits._
+          val pauseCollector = flowFromActor[Line, GcEvent](young)
 
-    val fanFactor = 1
-    val generations = builder.add(Broadcast[Line](fanFactor))
-    val merge = builder.add(Merge[GcEvent](fanFactor))
+          val gcStateFlow = flowFromActor[GcEvent, GcState](gcState)
 
-    val supportedPauseTypes: Set[PauseType] = Set(Full, Young, InitialMark, Remark, Mixed)
-    val youngFilter = Flow[Line].filter({
-      case G1GcLine(_, PauseEnd(ty, _, _)) if supportedPauseTypes.contains(ty) => true
-      case G1GcLine(_, PauseStart(ty, _)) if supportedPauseTypes.contains(ty) => true
-      case G1GcLine(_, NrRegions(_, _, _)) => true
-      case _ => false
-    })
+          val end = builder.add(gcStateFlow)
 
-    val youngFlow = flowFromActor[Line, GcEvent](young)
-
-    val gcStateFlow = flowFromActor[GcEvent, GcState](gcState)
-
-    val end = builder.add(gcStateFlow)
-
-    generations ~> youngFilter ~> youngFlow ~> merge
-    // todo deal with un-parsed lines down a different flow
-    //    val unknownLine: Flow[Line, Line, NotUsed] = Flow[Line].filter(_.isInstanceOf[UnknownLine])
-    //    generations ~> unknownLine ~> merge
-    merge ~> end
-    FlowShape(generations.in, end.out)
-  })
-
+          generations ~> pausesFilter ~> pauseCollector ~> merge
+          // todo deal with un-parsed lines down a different flow
+          merge ~> end
+          FlowShape(generations.in, end.out)
+        })
+      )
+  }
 
   private def flowFromActor[From: ClassTag, To: ClassTag](actor: ActorRef): Flow[From, To, NotUsed] = {
     implicit val timeout = Timeout(1 second)

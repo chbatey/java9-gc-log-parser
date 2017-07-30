@@ -1,5 +1,7 @@
 OpenJDK 64-Bit Server VM (25.121-b14) for linux-amd64 JRE (1.8.0_121-b14), built on Feb 27 2017 15:47:31 by "mockbuild" with gcc 6.3.1 20161221 (Red Hat 6.3.1-1)
-Memory: 4k page, physical 65916584k(34919172k free), swap 27811836k(27809588k free)
+Memory: 4k page, physical 65916584k(54441380k free), swap 27811836k(27811836k free)
 CommandLine flags: -XX:InitialHeapSize=1054665344 -XX:MaxHeapSize=16874645504 -XX:+PrintGC -XX:+PrintGCDateStamps -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+UseCompressedClassPointers -XX:+UseCompressedOops -XX:+UseParallelGC 
-2017-07-24T20:46:45.475+0100: 1.177: [GC (Metadata GC Threshold) [PSYoungGen: 129255K->14269K(300544K)] 129255K->14285K(987648K), 0.0073473 secs] [Times: user=0.02 sys=0.01, real=0.01 secs] 
-2017-07-24T20:46:45.482+0100: 1.185: [Full GC (Metadata GC Threshold) [PSYoungGen: 14269K->0K(300544K)] [ParOldGen: 16K->13506K(451584K)] 14285K->13506K(752128K), [Metaspace: 20323K->20316K(1067008K)], 0.0162663 secs] [Times: user=0.06 sys=0.00, real=0.01 secs] 
+2017-07-30T09:22:28.241+0100: 1.269: [GC (Metadata GC Threshold) [PSYoungGen: 113715K->14242K(300544K)] 113715K->14258K(987648K), 0.0072009 secs] [Times: user=0.03 sys=0.01, real=0.00 secs] 
+2017-07-30T09:22:28.249+0100: 1.277: [Full GC (Metadata GC Threshold) [PSYoungGen: 14242K->0K(300544K)] [ParOldGen: 16K->13433K(449024K)] 14258K->13433K(749568K), [Metaspace: 20338K->20332K(1067008K)], 0.0152529 secs] [Times: user=0.06 sys=0.00, real=0.02 secs] 
+2017-07-30T09:22:33.367+0100: 6.396: [GC (Metadata GC Threshold) [PSYoungGen: 127865K->10895K(300544K)] 141299K->24337K(749568K), 0.0065386 secs] [Times: user=0.03 sys=0.00, real=0.01 secs] 
+2017-07-30T09:22:33.374+0100: 6.402: [Full GC (Metadata GC Threshold) [PSYoungGen: 10895K->0K(300544K)] [ParOldGen: 13441K->14530K(754688K)] 24337K->14530K(1055232K), [Metaspace: 32845K->32845K(1081344K)], 0.0191276 secs] [Times: user=0.07 sys=0.00, real=0.02 secs] 

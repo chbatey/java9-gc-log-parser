@@ -1,41 +1,38 @@
 package info.batey
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.Done
+import akka.actor.ActorSystem
 import akka.event.{Logging, LoggingAdapter}
+import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Keep, Sink}
-import info.batey.GCLogFileModel.TimeOffset
-import info.batey.actors.GcStateActor.{GcState, GenerationSizes, HeapSize}
-import info.batey.actors.{GcStateActor, UnknownLineEvent, PauseActor}
-import scala.concurrent.ExecutionContext.Implicits._
 import spray.json._
 
-object GcService extends GcLogStream with GcStateJson {
+import scala.concurrent.ExecutionContext.Implicits._
+import scala.concurrent.Future
+import scala.io.StdIn
 
-  override implicit val system: ActorSystem = ActorSystem("GCParser")
-  override implicit val materialiser: ActorMaterializer = ActorMaterializer()
-
-  override val log: LoggingAdapter = Logging(system, "main")
-
-  override val young: ActorRef = system.actorOf(Props(classOf[PauseActor]), "YoungGen")
-  override val unknown: ActorRef = system.actorOf(Props(classOf[UnknownLineEvent]), "UnknownMsgs")
-  override val gcState: ActorRef = system.actorOf(Props(classOf[GcStateActor]), "GcState")
-
-  val mode = "console"
+object GcService extends GcStateJson with HttpFrontEnd {
+  implicit val system: ActorSystem = ActorSystem("GCParser")
+  implicit val materialiser: ActorMaterializer = ActorMaterializer()
+  implicit val log: LoggingAdapter = Logging(system, "main")
 
   def main(args: Array[String]): Unit = {
-    // todo cmd line args
-    // todo in http mode we need to create the actors per request
-    val (_, gcFun) = process.recover {
-        case e: Throwable =>
-          e.printStackTrace(System.out)
-          GcState(TimeOffset(0), 0, 0, 0, 0, 0, HeapSize(0, 0), 0.0, GenerationSizes(0, 0, 0, 0))
-      }.map(_.toJson)
-      .runWith(
-      streamedLogEvents,
-      Sink.foreach(println))
-    gcFun.flatMap(_ => system.terminate())
-    //todo open tsdb and prometheus sinks!
+    implicit val logStream = GcLogStream.create()
+
+    val host = "localhost"
+    val port = 9090
+
+    val consoleRun: Future[Done] = logStream.fromGcLog
+      .map(_.toJson)
+      .toMat(Sink.foreach(println))(Keep.right)
+      .run()
+
+    val httpBinding: Future[Http.ServerBinding] = Http().bindAndHandle(routes, host, port)
+
+    println(s"Servig HTTP requests at http://${host}:${port}/stream/gc")
+    println("Press ENTER to terminate")
+    StdIn.readLine()
+    httpBinding.flatMap(_.unbind())
   }
 }
-
