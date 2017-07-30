@@ -3,7 +3,7 @@
 <head>
     <title>GC is cool</title>
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
-    <script src="http://www.flotcharts.org/flot/jquery.flot.js"></script>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
     <link rel="stylesheet" type="text/css" href="http://www.flotcharts.org/flot/examples/examples.css">
     <meta charset="UTF-8">
 </head>
@@ -11,10 +11,12 @@
 
 <script>
     $( document ).ready(function() {
-        var source = new EventSource("/stream/pauses");
+        var source = new EventSource("/stream/gc");
         source.onmessage = function (event) {
-            var data = JSON.parse(event.data);
-            $("#preload h2").text('STW pauses: ' + data.totalStw + ' microseconds');
+            console.log(event.data);
+            if (event.data != "") {
+                $("#preload h2").text('Allocation:' + event.data+ ' microseconds');
+            }
         };
     });
 </script>

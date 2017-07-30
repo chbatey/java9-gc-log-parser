@@ -11,14 +11,17 @@ case object OneShot extends StreamMode
 case object Stream extends StreamMode
 
 class Conf(config: Config) {
-  val outputMode: OutputMode = Option(config.getString("gc.output"))
-    .map(_.toLowerCase)
-    .map(str => if (str.eq("http")) HttpMode else ConsoleMode)
-    .getOrElse(ConsoleMode)
+  val outputMode: OutputMode = {
+    println(config.getString("gc.output"))
+    Option(config.getString("gc.output"))
+      .map(_.toLowerCase)
+      .map(str => if (str.equals("http")) HttpMode else ConsoleMode)
+      .getOrElse(ConsoleMode)
+  }
 
   val streamMode: StreamMode = Option(config.getString("gc.stream"))
     .map(_.toLowerCase)
-    .map(str => if (str.eq("stream")) Stream else OneShot)
+    .map(str => if (str.equals("stream")) Stream else OneShot)
     .getOrElse(OneShot)
 
   val filePath: String = config.getString("gc.file")
