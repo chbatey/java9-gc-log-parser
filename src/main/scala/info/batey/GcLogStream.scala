@@ -72,6 +72,7 @@ class GcLogStream(implicit system: ActorSystem) {
           FlowShape(generations.in, end.out)
         })
       )
+      .via(Dedupe.flow)
   }
 
   private def flowFromActor[From: ClassTag, To: ClassTag](actor: ActorRef): Flow[From, To, NotUsed] = {
@@ -81,5 +82,39 @@ class GcLogStream(implicit system: ActorSystem) {
       (actor ? from).mapTo[To]
     }
     Flow[From].mapAsync(1)(processor)
+  }
+
+  sealed trait DedupeState[T]
+  case class Empty[T]() extends DedupeState[T]
+  case class Dedupe[T](last: T, value: Option[T]) extends DedupeState[T]
+  object Dedupe {
+    def next[T](state: DedupeState[T], item: T): Dedupe[T] = {
+      state match {
+        case Dedupe(si, _) if si.equals(item) => Dedupe[T](item, None)
+        case _ => Dedupe(item, Some(item))
+      }
+    }
+
+    def lift[T](state: DedupeState[T]): Option[T] = {
+      state match {
+        case Dedupe(_, v) => v
+        case _ => None
+      }
+    }
+
+    def filter[T](value: Option[T]): Boolean = {
+      value match {
+        case Some(v) => true
+        case _ => false
+      }
+    }
+
+    def flow[T]: Flow[T, T, NotUsed] = {
+      Flow[T]
+        .scan[DedupeState[T]](Empty())(Dedupe.next)
+        .map(Dedupe.lift)
+        .filter(Dedupe.filter)
+        .map(i => i.get)
+    }
   }
 }
