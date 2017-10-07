@@ -16,9 +16,9 @@ trait HttpFrontEnd extends GcStateJson {
   implicit val timeout = Timeout(1, TimeUnit.SECONDS)
 
   def routes(implicit logStream: GcLogStream, config: Conf): Route = cors() {
-    pathPrefix("static") {
+    pathPrefix("app/src/main/resources/static") {
       encodeResponse {
-        getFromResourceDirectory("static")
+        getFromResourceDirectory("app/src/main/resources/static")
       }
     } ~
     pathPrefix("stream") {
@@ -26,7 +26,7 @@ trait HttpFrontEnd extends GcStateJson {
         val pipeline = logStream.tailFile(config.filePath)
           .map(_.toJson.prettyPrint)
           .map(ServerSentEvent(_, Some("gc-event")))
-          .keepAlive(1 second, () => ServerSentEvent.heartbeat)
+          .keepAlive(1.second, () => ServerSentEvent.heartbeat)
           .recover {
             case e: Throwable =>
               println(e)

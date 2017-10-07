@@ -42,6 +42,7 @@ class GcLogStream(implicit system: ActorSystem) {
     val uuid = UUID.randomUUID()
     val young: ActorRef = system.actorOf(Props(classOf[PauseActor]), s"YoungGen-${uuid.toString}")
     val gcState: ActorRef = system.actorOf(Props(classOf[GcStateActor]), s"GcState-${uuid.toString}")
+
     Flow[String]
       .map(parse(gcParser, _).get)
       .via(
@@ -60,11 +61,11 @@ class GcLogStream(implicit system: ActorSystem) {
             case _ => false
           })
 
-          val pauseCollector = flowFromActor[Line, GcEvent](young)
+          val pauseCollector: Flow[Line, GcEvent, NotUsed] = flowFromActor[Line, GcEvent](young)
 
-          val gcStateFlow = flowFromActor[GcEvent, GcState](gcState)
+          val gcStateFlow: Flow[GcEvent, GcState, NotUsed] = flowFromActor[GcEvent, GcState](gcState)
 
-          val end = builder.add(gcStateFlow)
+          val end: FlowShape[GcEvent, GcState] = builder.add(gcStateFlow)
 
           generations ~> pausesFilter ~> pauseCollector ~> merge
           // todo deal with un-parsed lines down a different route

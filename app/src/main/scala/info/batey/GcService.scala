@@ -21,7 +21,6 @@ object GcService extends GcStateJson with HttpFrontEnd {
     implicit val logStream = GcLogStream.create()
     implicit val conf = Conf()
 
-
     val modes = (conf.outputMode, conf.streamMode)
     println("Running in " + modes)
 

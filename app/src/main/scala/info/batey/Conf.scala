@@ -12,7 +12,6 @@ case object Stream extends StreamMode
 
 class Conf(config: Config) {
   val outputMode: OutputMode = {
-    println(config.getString("gc.output"))
     Option(config.getString("gc.output"))
       .map(_.toLowerCase)
       .map(str => if (str.equals("http")) HttpMode else ConsoleMode)
