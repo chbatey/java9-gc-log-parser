@@ -49,7 +49,7 @@ class CollectPauseLinesTest extends TestKitWithCleanup(ActorSystem("CollectByGcE
       pub.sendNext(humongousRegions)
       sub.expectNoMessage(waitTime)
       pub.sendNext(end)
-      sub.expectNext() should equal(DetailedPause(
+      sub.expectNext() should equal(Pause(
         end.metadata.offset,
         pauseType,
         cs.duration,
@@ -80,7 +80,7 @@ class CollectPauseLinesTest extends TestKitWithCleanup(ActorSystem("CollectByGcE
       pub.sendNext(humongousRegions)
       pub.sendNext(end)
 
-      sub.requestNext() should equal(DetailedPause(
+      sub.requestNext() should equal(Pause(
         end.metadata.offset,
         pauseType,
         cs.duration,
@@ -96,7 +96,7 @@ class CollectPauseLinesTest extends TestKitWithCleanup(ActorSystem("CollectByGcE
       pub.sendNext(humongousRegions)
       pub.sendNext(end.copy(event = pe.copy(which = Full)))
 
-      sub.requestNext() should equal(DetailedPause(
+      sub.requestNext() should equal(Pause(
         end.metadata.offset,
         Full,
         cs.duration,

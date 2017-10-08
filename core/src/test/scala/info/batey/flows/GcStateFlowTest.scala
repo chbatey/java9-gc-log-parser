@@ -26,7 +26,7 @@ class GcStateFlowTest extends TestKit(ActorSystem("PauseFlowTest")) with WordSpe
 
       val heapSizes = HeapSizes(10, 5, 20)
       val genSizes = GenerationSizes(1, 2, 3, 4)
-      pub.sendNext(DetailedPause(1, Young, 1.second, heapSizes, genSizes))
+      pub.sendNext(Pause(1, Young, 1.second, heapSizes, genSizes))
       sub.requestNext() should equal(GcState(
         timeOffset = 1,
         0,
@@ -35,7 +35,7 @@ class GcStateFlowTest extends TestKit(ActorSystem("PauseFlowTest")) with WordSpe
 
       val newHeapSizes = HeapSizes(100, 50, 200)
       val newGenSizes = GenerationSizes(11, 12, 13, 14)
-      pub.sendNext(DetailedPause(2, Young, 2.second, newHeapSizes, newGenSizes))
+      pub.sendNext(Pause(2, Young, 2.second, newHeapSizes, newGenSizes))
       sub.requestNext() should equal(GcState(
         timeOffset = 2,
         0,
@@ -47,7 +47,7 @@ class GcStateFlowTest extends TestKit(ActorSystem("PauseFlowTest")) with WordSpe
       val (pub, sub) = probe()
       val heapSizes = HeapSizes(10, 5, 20)
       val genSizes = GenerationSizes(1, 2, 3, 4)
-      pub.sendNext(DetailedPause(1, InitialMark, 1.second, heapSizes, genSizes))
+      pub.sendNext(Pause(1, InitialMark, 1.second, heapSizes, genSizes))
       sub.requestNext() should equal(GcState(
         timeOffset = 1,
         0,
@@ -60,7 +60,7 @@ class GcStateFlowTest extends TestKit(ActorSystem("PauseFlowTest")) with WordSpe
       val (pub, sub) = probe()
       val heapSizes = HeapSizes(10, 5, 20)
       val genSizes = GenerationSizes(1, 2, 3, 4)
-      pub.sendNext(DetailedPause(1, Full, 1.second, heapSizes, genSizes))
+      pub.sendNext(Pause(1, Full, 1.second, heapSizes, genSizes))
       sub.requestNext() should equal(GcState(
         timeOffset = 1,
         fullGcs = 1,
@@ -73,7 +73,7 @@ class GcStateFlowTest extends TestKit(ActorSystem("PauseFlowTest")) with WordSpe
       val (pub, sub) = probe()
       val heapSizes = HeapSizes(10, 5, 20)
       val genSizes = GenerationSizes(1, 2, 3, 4)
-      pub.sendNext(DetailedPause(1, Mixed, 1.second, heapSizes, genSizes))
+      pub.sendNext(Pause(1, Mixed, 1.second, heapSizes, genSizes))
       sub.requestNext() should equal(GcState(
         timeOffset = 1,
         fullGcs = 0,
@@ -87,7 +87,7 @@ class GcStateFlowTest extends TestKit(ActorSystem("PauseFlowTest")) with WordSpe
       val (pub, sub) = probe()
       val heapSizes = HeapSizes(10, 5, 20)
       val genSizes = GenerationSizes(1, 2, 3, 4)
-      pub.sendNext(DetailedPause(1, Cleanup, 1.second, heapSizes, genSizes))
+      pub.sendNext(Pause(1, Cleanup, 1.second, heapSizes, genSizes))
       sub.requestNext() should equal(GcState(
         timeOffset = 1,
         fullGcs = 0,

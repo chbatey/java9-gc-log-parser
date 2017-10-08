@@ -2,12 +2,13 @@ package info.batey.flows
 
 import akka.NotUsed
 import akka.stream.scaladsl._
+import com.typesafe.scalalogging.LazyLogging
 import info.batey.GCLogFileModel._
 import info.batey.GcStateModel._
 
 import scala.collection.immutable
 
-object CollectPauseLines {
+object CollectPauseLines extends LazyLogging {
 
   val CollectByGcEvent: Flow[Line, GcEvent, NotUsed] =
     Flow[Line].statefulMapConcat[GcEvent](() => {
@@ -16,7 +17,6 @@ object CollectPauseLines {
       var regions = Map[Region, NrRegions]()
 
       (line: Line) => {
-        println(line)
         line match {
           case G1GcLine(Metadata(_, None, _, _), _) =>
             immutable.Iterable(NotInteresting())
@@ -33,7 +33,7 @@ object CollectPauseLines {
 
             val events = pauseType match {
               case Remark =>
-                 immutable.Iterable(RemarkPause(
+                immutable.Iterable(RemarkPause(
                   line.metadata.offset,
                   duration,
                   HeapSizes(before, after, total)
@@ -42,7 +42,7 @@ object CollectPauseLines {
                 if (!regions.contains(Eden) || !regions.contains(Survivor) || !regions.contains(Old) || !regions.contains(Humongous))
                   throw new RuntimeException(s"Received PauseEnd without receiving region information. Either a bug or invalid GC log. Regions: {${regions.keys.mkString(",")}}. EventId: ${id}")
 
-                immutable.Iterable(DetailedPause(
+                immutable.Iterable(Pause(
                   line.metadata.offset,
                   pauseType,
                   duration,
@@ -60,7 +60,12 @@ object CollectPauseLines {
             regions = Map.empty
             id = -1
             events
+          case l =>
+            logger.warn("Line not supported yet, please raise a PR: {}", l)
+            immutable.Iterable.empty[GcEvent]
+
         }
+
       }
     })
 }

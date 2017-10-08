@@ -21,6 +21,7 @@ lazy val core = (project in file("core")).
       "com.typesafe.akka" %% "akka-stream" % akkaVersion,
       "com.lightbend.akka" %% "akka-stream-alpakka-file" % "0.10",
       "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6",
+      "com.typesafe.scala-logging" %% "scala-logging" % "3.7.2",
 
       "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
       "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % Test,

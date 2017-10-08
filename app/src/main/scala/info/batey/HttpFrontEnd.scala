@@ -15,7 +15,7 @@ import scala.concurrent.duration._
 trait HttpFrontEnd extends GcStateJson {
   implicit val timeout = Timeout(1, TimeUnit.SECONDS)
 
-  def routes(implicit logStream: GcLogStream, config: Conf): Route = cors() {
+  def routes(implicit config: Conf): Route = cors() {
     pathPrefix("app/src/main/resources/static") {
       encodeResponse {
         getFromResourceDirectory("app/src/main/resources/static")
@@ -23,7 +23,7 @@ trait HttpFrontEnd extends GcStateJson {
     } ~
     pathPrefix("stream") {
       path("gc") {
-        val pipeline = logStream.tailFile(config.filePath)
+        val pipeline = GcLogStream.liveStateSource(config.filePath)
           .map(_.toJson.prettyPrint)
           .map(ServerSentEvent(_, Some("gc-event")))
           .keepAlive(1.second, () => ServerSentEvent.heartbeat)
