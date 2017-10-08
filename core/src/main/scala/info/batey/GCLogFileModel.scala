@@ -29,11 +29,12 @@ object GCLogFileModel {
 
   sealed trait LineDesc
   case class PauseStart(which: PauseType, reason: Option[Reason]) extends LineDesc
+  case class NrRegions(region: Region, before: Long, after: Long) extends LineDesc
   case class PauseEnd(which: PauseType, stats: CollectionStats, reason: Option[Reason]) extends LineDesc
+
   case object ConcurrentCycle extends LineDesc
   case object UsingG1 extends LineDesc
   case object ToSpaceExhausted extends LineDesc
-  case class NrRegions(region: Region, before: Long, after: Long) extends LineDesc
 
   sealed trait HeapInfo extends LineDesc
   case class RegionSize(size: Long) extends HeapInfo

@@ -77,7 +77,6 @@ class PauseActor extends Actor {
         pauseType,
         dur,
         HeapSizes(before, after, total),
-        allocationRate,
         GenerationSizes(eden.after, surv.after, old.after, hum.after))
 
       previousHeapSize = after
@@ -99,8 +98,7 @@ class PauseActor extends Actor {
       sender ! RemarkPause(
         offset,
         dur,
-        HeapSizes(before, after, total),
-        allocationRate)
+        HeapSizes(before, after, total))
 
       previousHeapSize = after
       lastOffset = offset.millis

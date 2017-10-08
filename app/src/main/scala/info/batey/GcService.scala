@@ -33,7 +33,10 @@ object GcService extends GcStateJson with HttpFrontEnd {
         streamHttp
     }
 
-    end.flatMap(_ => system.terminate())
+    end.onComplete(end => {
+      println(s"Stream finished: $end")
+      system.terminate()
+    })
   }
 
   def consoleOneShot(implicit logStream: GcLogStream, config: Conf): Future[Done] =
@@ -50,7 +53,7 @@ object GcService extends GcStateJson with HttpFrontEnd {
 
   def streamHttp(implicit logStream: GcLogStream, config: Conf): Future[Unit] = {
     val httpBinding = Http().bindAndHandle(routes, config.httpHost, config.httpPort)
-    println(s"Servig HTTP requests at http://${config.httpHost}/${config.httpPort}/gc")
+    println(s"Serving HTTP requests at http://${config.httpHost}/${config.httpPort}/gc")
     println("Press ENTER to terminate")
     StdIn.readLine()
     httpBinding.flatMap(_.unbind())

@@ -13,6 +13,7 @@ import akka.util.{ByteString, Timeout}
 import info.batey.GCLogFileModel._
 import info.batey.actors.GcStateActor.{GcEvent, GcState}
 import info.batey.actors.{GcStateActor, PauseActor, UnknownLineEvent}
+import info.batey.flows.CollectPauseLines
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -28,6 +29,7 @@ class GcLogStream(implicit system: ActorSystem) {
   import GcLineParser._
 
   def oneOffFromFile(path: String): Source[GcState, _] = {
+    println(s"Running with file: $path")
      FileIO.fromPath(Paths.get(path))
       .via(Framing.delimiter(ByteString("\n"), maximumFrameLength = 1024))
       .map(_.utf8String)
@@ -61,7 +63,7 @@ class GcLogStream(implicit system: ActorSystem) {
             case _ => false
           })
 
-          val pauseCollector: Flow[Line, GcEvent, NotUsed] = flowFromActor[Line, GcEvent](young)
+          val pauseCollector: Flow[Line, GcEvent, NotUsed] = CollectPauseLines.CollectByGcEvent
 
           val gcStateFlow: Flow[GcEvent, GcState, NotUsed] = flowFromActor[GcEvent, GcState](gcState)
 
