@@ -11,9 +11,8 @@ import akka.stream.alpakka.file.scaladsl.FileTailSource
 import akka.stream.scaladsl._
 import akka.util.{ByteString, Timeout}
 import info.batey.GCLogFileModel._
-import info.batey.actors.GcStateActor.{GcEvent, GcState}
-import info.batey.actors.{GcStateActor, PauseActor, UnknownLineEvent}
-import info.batey.flows.CollectPauseLines
+import GcStateModel.{GcEvent, GcState}
+import info.batey.flows.{CollectPauseLines, GcStateFlow}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -41,10 +40,6 @@ class GcLogStream(implicit system: ActorSystem) {
       .via(eventsFlow())
 
   private def eventsFlow(): Flow[String, GcState, NotUsed] = {
-    val uuid = UUID.randomUUID()
-    val young: ActorRef = system.actorOf(Props(classOf[PauseActor]), s"YoungGen-${uuid.toString}")
-    val gcState: ActorRef = system.actorOf(Props(classOf[GcStateActor]), s"GcState-${uuid.toString}")
-
     Flow[String]
       .map(parse(gcParser, _).get)
       .via(
@@ -64,9 +59,7 @@ class GcLogStream(implicit system: ActorSystem) {
           })
 
           val pauseCollector: Flow[Line, GcEvent, NotUsed] = CollectPauseLines.CollectByGcEvent
-
-          val gcStateFlow: Flow[GcEvent, GcState, NotUsed] = flowFromActor[GcEvent, GcState](gcState)
-
+          val gcStateFlow: Flow[GcEvent, GcState, NotUsed] = GcStateFlow.GcStateFlow
           val end: FlowShape[GcEvent, GcState] = builder.add(gcStateFlow)
 
           generations ~> pausesFilter ~> pauseCollector ~> merge
@@ -75,14 +68,5 @@ class GcLogStream(implicit system: ActorSystem) {
           FlowShape(generations.in, end.out)
         })
       )
-  }
-
-  private def flowFromActor[From: ClassTag, To: ClassTag](actor: ActorRef): Flow[From, To, NotUsed] = {
-    implicit val timeout = Timeout(1 second)
-
-    val processor: From => Future[To] = (from: From) => {
-      (actor ? from).mapTo[To]
-    }
-    Flow[From].mapAsync(1)(processor)
   }
 }

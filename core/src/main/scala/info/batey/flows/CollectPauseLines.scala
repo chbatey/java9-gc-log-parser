@@ -3,7 +3,7 @@ package info.batey.flows
 import akka.NotUsed
 import akka.stream.scaladsl._
 import info.batey.GCLogFileModel._
-import info.batey.actors.GcStateActor._
+import info.batey.GcStateModel._
 
 import scala.collection.immutable
 

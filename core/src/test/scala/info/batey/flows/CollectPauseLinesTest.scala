@@ -7,7 +7,7 @@ import akka.stream.testkit.{TestPublisher, TestSubscriber}
 import akka.stream.testkit.scaladsl._
 import info.batey.GCLogFileModel._
 import info.batey.TestKitWithCleanup
-import info.batey.actors.GcStateActor._
+import info.batey.GcStateModel._
 
 import scala.concurrent.duration._
 
@@ -124,7 +124,7 @@ class CollectPauseLinesTest extends TestKitWithCleanup(ActorSystem("CollectByGcE
       val cs = CollectionStats(1, 2, 3, 1.second)
       val (nrEden, nrSurvivor, nrOld, nrHum) = (0, 2, 3, 4)
       val start = G1GcLine(Metadata(1, Some(1)), PauseStart(pauseType, None))
-      val edenRegion = G1GcLine(Metadata(2, Some(1)), NrRegions(Eden, 12, 0))
+      val edenRegion = G1GcLine(Metadata(2, Some(1)), NrRegions(Eden, 12, nrEden))
       val nrRegionsSurvivor = NrRegions(Survivor, 0, nrSurvivor)
       val survivorRegion = G1GcLine(Metadata(2, Some(1)), nrRegionsSurvivor)
       val oldRegions = G1GcLine(Metadata(2, Some(1)), NrRegions(Old, nrOld, nrOld))

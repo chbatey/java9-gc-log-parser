@@ -6,6 +6,7 @@ lazy val root = (project in file(".")).
       version := "0.1.0-SNAPSHOT"
     )),
     organization := "info.batey",
+    name := "gc-log-parser",
     wartremoverErrors ++= Warts.all
   )
   .aggregate(core, app)
