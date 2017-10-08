@@ -1,11 +1,13 @@
 package info.batey
 
+import com.typesafe.scalalogging.LazyLogging
+
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
 import scala.util.parsing.combinator.JavaTokenParsers
 
-object GcLineParser extends JavaTokenParsers {
+object GcLineParser extends JavaTokenParsers with LazyLogging {
 
   import GCLogFileModel._
   import TimeOffset._
@@ -17,11 +19,17 @@ object GcLineParser extends JavaTokenParsers {
   def level: Parser[Level] = "[" ~ "(info|warn)".r ~ "]" ^^ {
     case _ ~ "info" ~ _ => Info
     case _ ~ "warn" ~ _ => Warn
+    case _ ~ "debug" ~ _ => Debug
+    case _ ~ level ~ _ =>
+      logger.warn("Unknown log level, please raise a PR: {}", level)
+      Unknown
   }
 
   def offset: Parser[Duration] = floatingPointNumber ~ "(ms|s)".r ^^ {
     case time ~ "ms" => time.toDouble milliseconds
     case time ~ "s" => time.toDouble seconds
+    case l =>
+      throw new RuntimeException("Unexpected duration format. Please raise a PR: " + l)
   }
 
   def tag: Parser[Tag] = "(gc|start|heap|phases)".r ~ opt(",") ^^ {
@@ -29,10 +37,13 @@ object GcLineParser extends JavaTokenParsers {
     case "heap" ~ _ => Heap
     case "phases" ~ _ => Phases
     case "start" ~ _ => Start
+    case tag ~ _ =>
+      logger.warn("Unknown tag. Please raise a PR: {}", tag)
+      UnknownTag
   }
 
-  def header: Parser[Metadata] = "[" ~ offset ~ "]" ~ level ~ "[" ~ (tag+) ~ "]" ~ opt(eventId) ^^ {
-    case _ ~ ts ~ _ ~ lvl ~ _ ~ tags ~ _  ~ eventId => Metadata(ts.toMillis, eventId, lvl, tags.toSet)
+  def header: Parser[Metadata] = "[" ~ offset ~ "]" ~ level ~ "[" ~ (tag +) ~ "]" ~ opt(eventId) ^^ {
+    case _ ~ ts ~ _ ~ lvl ~ _ ~ tags ~ _ ~ eventId => Metadata(ts.toMillis, eventId, lvl, tags.toSet)
   }
 
   def collectionStats: Parser[CollectionStats] = wholeNumber ~ "M->" ~ wholeNumber ~ "M(" ~ wholeNumber ~ "M) " ~ offset ^^ {
@@ -65,7 +76,7 @@ object GcLineParser extends JavaTokenParsers {
   def concurrentCycle: Parser[LineDesc] = "Concurrent Cycle".r ^^ (_ => ConcurrentCycle)
   def tooSpace: Parser[LineDesc] = "To-space exhausted".r ^^ (_ => ToSpaceExhausted)
 
-  def usingG1: Parser[LineDesc] = "Using G1".r ^^ { _ => UsingG1}
+  def usingG1: Parser[LineDesc] = "Using G1".r ^^ { _ => UsingG1 }
 
   def regionSize: Parser[RegionSize] = "Heap region size: " ~ wholeNumber ~ "M" ^^ {
     case _ ~ num ~ _ => RegionSize(num.toLong)

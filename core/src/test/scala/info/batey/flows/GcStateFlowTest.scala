@@ -120,7 +120,6 @@ class GcStateFlowTest extends TestKit(ActorSystem("PauseFlowTest")) with WordSpe
         .via(GcStateFlow.GcStateFlow)
         .toMat(TestSink.probe[GcState])(Keep.both)
         .run
-
     }
   }
 }

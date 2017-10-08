@@ -8,6 +8,7 @@ object GCLogFileModel {
   case object Debug extends Level
   case object Info extends Level
   case object Warn extends Level
+  case object Unknown extends Level
 
   sealed trait Tag
   case object Gc extends Tag
@@ -19,6 +20,7 @@ object GCLogFileModel {
   case object Metaspace extends Tag
   case object Marking extends Tag
   case object Exit extends Tag
+  case object UnknownTag extends Tag
 
   // todo remove defaults
   case class Metadata(offset: TimeOffset, eventId: Option[Int], level: Level = Info, tags: Set[Tag] = Set(Gc))

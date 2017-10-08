@@ -21,13 +21,15 @@ object GcService extends GcStateJson with HttpFrontEnd {
     implicit val conf = Conf()
 
     val modes = (conf.outputMode, conf.streamMode)
-    val end: Future[_] = modes match {
+    val end = modes match {
       case (ConsoleMode, OneShot) =>
         consoleOneShot
       case (ConsoleMode, Stream) =>
         consoleStream
       case (HttpMode, Stream) =>
         streamHttp
+      case _ =>
+        throw new RuntimeException("Unsupported config: " + modes)
     }
 
     end.onComplete(end => {
