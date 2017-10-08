@@ -32,7 +32,7 @@ object GcLineParser extends JavaTokenParsers {
   }
 
   def header: Parser[Metadata] = "[" ~ offset ~ "]" ~ level ~ "[" ~ (tag+) ~ "]" ~ opt(eventId) ^^ {
-    case _ ~ ts ~ _ ~ lvl ~ _ ~ tags ~ _  ~ _ => Metadata(ts.toMillis, lvl, tags.toSet)
+    case _ ~ ts ~ _ ~ lvl ~ _ ~ tags ~ _  ~ eventId => Metadata(ts.toMillis, eventId, lvl, tags.toSet)
   }
 
   def collectionStats: Parser[CollectionStats] = wholeNumber ~ "M->" ~ wholeNumber ~ "M(" ~ wholeNumber ~ "M) " ~ offset ^^ {

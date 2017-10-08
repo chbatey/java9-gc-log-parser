@@ -2,10 +2,11 @@ lazy val root = (project in file(".")).
   settings(
     inThisBuild(List(
       organization := "info.batey",
-      scalaVersion := "2.12.2",
+      scalaVersion := "2.12.3",
       version := "0.1.0-SNAPSHOT"
     )),
-    name := "gc-log-parser"
+    organization := "info.batey",
+    wartremoverErrors ++= Warts.all
   )
   .aggregate(core, app)
 
@@ -40,9 +41,6 @@ lazy val app = (project in file("app"))
       "org.scalatest" %% "scalatest" % "3.0.1" % Test
     )
   )
-
-
-
 
 assemblyMergeStrategy in assembly := {
   case PathList(ps@_*) if ps.last endsWith ".properties" => MergeStrategy.concat

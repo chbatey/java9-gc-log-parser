@@ -2,7 +2,6 @@ package info.batey.actors
 
 import akka.actor.Actor
 import akka.event.Logging
-import info.batey.GCLogFileModel
 import info.batey.GCLogFileModel._
 import info.batey.actors.GcStateActor._
 
@@ -53,15 +52,12 @@ class GcStateActor extends Actor {
       }
       sender ! newState
       become(gcState(newState))
-    case BasicPause(timeOffset, pauseType, _, HeapSizes(_, after, total), allocationRatePerMb) =>
-      val newState = pauseType match {
-        case Remark =>
-          gs.copy(timeOffset = timeOffset,
-            remarks = gs.remarks + 1,
-            heapSize = HeapSize(after, total),
-            allocationRatePerMb = allocationRatePerMb,
-          )
-      }
+    case RemarkPause(timeOffset, _, HeapSizes(_, after, total), allocationRatePerMb) =>
+      val newState = gs.copy(timeOffset = timeOffset,
+        remarks = gs.remarks + 1,
+        heapSize = HeapSize(after, total),
+        allocationRatePerMb = allocationRatePerMb,
+      )
       sender ! newState
       become(gcState(newState))
     case NotInteresting() =>
@@ -91,7 +87,7 @@ object GcStateActor {
   sealed trait GcEvent
   // shouldn't really use PauseType as it is the file model
   case class DetailedPause(timeOffset: TimeOffset, gen: PauseType, dur: Duration, heapSize: HeapSizes, allocationRatePerMb: Double, genSizes: GenerationSizes) extends GcEvent
-  case class BasicPause(timeOffset: TimeOffset, gen: PauseType, dur: Duration, heapSize: HeapSizes, allocationRatePerMb: Double) extends GcEvent
+  case class RemarkPause(timeOffset: TimeOffset, dur: Duration, heapSize: HeapSizes, allocationRatePerMb: Double) extends GcEvent
   case class NotInteresting() extends GcEvent
 
   case class HeapSizes(before: Long, after: Long, total: Long)

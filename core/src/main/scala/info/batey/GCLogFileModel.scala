@@ -21,7 +21,7 @@ object GCLogFileModel {
   case object Exit extends Tag
 
   // todo remove defaults
-  case class Metadata(offset: TimeOffset, level: Level = Info, tags: Set[Tag] = Set(Gc))
+  case class Metadata(offset: TimeOffset, eventId: Option[Int], level: Level = Info, tags: Set[Tag] = Set(Gc))
 
   sealed trait Line
   case class G1GcLine(metadata: Metadata, event: LineDesc) extends Line

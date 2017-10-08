@@ -8,6 +8,7 @@ import info.batey.actors.GcStateActor._
 import scala.language.postfixOps
 
 class PauseActor extends Actor {
+
   import context._
 
   val log = Logging(context.system, this)
@@ -19,15 +20,14 @@ class PauseActor extends Actor {
   private val basicPauses: Set[PauseType] = Set(Remark)
 
   def receive: Receive = awaitingPause()
-  // Fsm??
 
   def awaitingPause(): Receive = {
-    case G1GcLine(_, PauseStart(pauseType,_)) if !basicPauses.contains(pauseType) =>
+    case G1GcLine(_, PauseStart(pauseType, _)) if !basicPauses.contains(pauseType) =>
       sender ! NotInteresting()
       become(awaitingEdenStats(pauseType))
-    case G1GcLine(_, PauseStart(pauseType,_)) =>
+    case G1GcLine(_, PauseStart(_, _)) =>
       sender ! NotInteresting()
-      become(awaitingBasicPause(pauseType))
+      become(awaitingRemark())
     case _@msg =>
       // todo remove this once we handle all types of pauses
       sender ! NotInteresting()
@@ -48,7 +48,7 @@ class PauseActor extends Actor {
     case _@msg => log.warning("3 {}", msg)
   }
 
-  def awaitingOldSTats(pauseType: PauseType,eden: NrRegions, surv: NrRegions): Receive = {
+  def awaitingOldSTats(pauseType: PauseType, eden: NrRegions, surv: NrRegions): Receive = {
     case G1GcLine(_, nr@NrRegions(Old, _, _)) =>
       sender ! NotInteresting()
       become(awaitingHumongousStats(pauseType, eden, surv, nr))
@@ -63,7 +63,7 @@ class PauseActor extends Actor {
   }
 
   def awaitingEnd(pauseType: PauseType, eden: NrRegions, surv: NrRegions, old: NrRegions, hum: NrRegions): Receive = {
-    case G1GcLine(Metadata(offset,_, _), PauseEnd(pt, CollectionStats(before, after, total, dur), _)) if pauseType == pt => // bug if this guard does not match
+    case G1GcLine(Metadata(offset, _, _, _), PauseEnd(pt, CollectionStats(before, after, total, dur), _)) if pauseType == pt => // bug if this guard does not match
       val totalAllocatedMB = before - previousHeapSize
       val timeBetweenCollectionMillis = offset.millis - lastOffset
       val allocationRate = (totalAllocatedMB / timeBetweenCollectionMillis.toDouble) * 1000
@@ -86,8 +86,8 @@ class PauseActor extends Actor {
     case _@msg => log.warning("6 {}", msg)
   }
 
-  def awaitingBasicPause(pauseType: PauseType): Receive = {
-     case G1GcLine(Metadata(offset,_, _), PauseEnd(pt, CollectionStats(before, after, total, dur), _)) if pauseType == pt => // bug if this guard does not match
+  def awaitingRemark(): Receive = {
+    case G1GcLine(Metadata(offset, _, _, _), PauseEnd(pt, CollectionStats(before, after, total, dur), _)) if pt == Remark =>
       val totalAllocatedMB = before - previousHeapSize
       val timeBetweenCollectionMillis = offset.millis - lastOffset
       val allocationRate = (totalAllocatedMB / timeBetweenCollectionMillis.toDouble) * 1000
@@ -96,9 +96,8 @@ class PauseActor extends Actor {
       log.debug("Allocation rate per second: {}", allocationRate)
 
       totalPauses += dur.toMicros
-      sender ! BasicPause(
+      sender ! RemarkPause(
         offset,
-        pauseType,
         dur,
         HeapSizes(before, after, total),
         allocationRate)

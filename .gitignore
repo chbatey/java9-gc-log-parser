@@ -3,4 +3,5 @@ taget
 .idea
 gc.log
 target
-service-gc.log
+service-gc.log*.swp
+.*.swp
